@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { Leaf, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface NavbarProps {
   isAuthenticated?: boolean;
@@ -20,11 +21,21 @@ export function Navbar({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 backdrop-blur-lg bg-background/90 border-b">
+    <motion.nav
+      className="sticky top-0 z-50 backdrop-blur-lg bg-background/90 border-b"
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 gap-4">
           <Link href="/" className="flex items-center gap-2 hover-elevate active-elevate-2 px-2 py-1 rounded-md" data-testid="link-home">
-            <Leaf className="h-6 w-6 text-primary" />
+            <motion.div
+              whileHover={{ rotate: 360 }}
+              transition={{ duration: 0.6 }}
+            >
+              <Leaf className="h-6 w-6 text-primary" />
+            </motion.div>
             <span className="text-xl font-bold">FoodSaver</span>
           </Link>
 
@@ -70,35 +81,43 @@ export function Navbar({
           </div>
         </div>
 
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t py-4 space-y-2">
-            <Link href="#about" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-about-mobile">
-              About
-            </Link>
-            {isAuthenticated && (
-              <Link href="/dashboard" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-dashboard-mobile">
-                Dashboard
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              className="md:hidden border-t py-4 space-y-2"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Link href="#about" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-about-mobile">
+                About
               </Link>
-            )}
-            <div className="pt-2 space-y-2">
-              {!isAuthenticated ? (
-                <>
-                  <Button variant="ghost" className="w-full" onClick={onLoginClick} data-testid="button-login-mobile">
-                    Login
-                  </Button>
-                  <Button className="w-full" onClick={onRegisterClick} data-testid="button-register-mobile">
-                    Get Started
-                  </Button>
-                </>
-              ) : (
-                <Button variant="ghost" className="w-full" onClick={onLogoutClick} data-testid="button-logout-mobile">
-                  Logout
-                </Button>
+              {isAuthenticated && (
+                <Link href="/dashboard" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-dashboard-mobile">
+                  Dashboard
+                </Link>
               )}
-            </div>
-          </div>
-        )}
+              <div className="pt-2 space-y-2">
+                {!isAuthenticated ? (
+                  <>
+                    <Button variant="ghost" className="w-full" onClick={onLoginClick} data-testid="button-login-mobile">
+                      Login
+                    </Button>
+                    <Button className="w-full" onClick={onRegisterClick} data-testid="button-register-mobile">
+                      Get Started
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="ghost" className="w-full" onClick={onLogoutClick} data-testid="button-logout-mobile">
+                    Logout
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </nav>
+    </motion.nav>
   );
 }
