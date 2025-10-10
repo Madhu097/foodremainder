@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   
   //todo: remove mock functionality
@@ -86,15 +87,35 @@ export default function DashboardPage() {
       status = "expiring";
     }
 
-    const newItem: FoodItem = {
-      id: Date.now().toString(),
-      ...data,
-      status,
-      daysLeft,
-    };
+    if (editingItem) {
+      // Update existing item
+      const updatedItem: FoodItem = {
+        ...editingItem,
+        ...data,
+        status,
+        daysLeft,
+      };
+      setFoodItems(foodItems.map((item) => 
+        item.id === editingItem.id ? updatedItem : item
+      ));
+      console.log("Updated food item:", updatedItem);
+      setEditingItem(null);
+    } else {
+      // Add new item
+      const newItem: FoodItem = {
+        id: Date.now().toString(),
+        ...data,
+        status,
+        daysLeft,
+      };
+      setFoodItems([...foodItems, newItem]);
+      console.log("Added new food item:", newItem);
+    }
+  };
 
-    setFoodItems([...foodItems, newItem]);
-    console.log("Added new food item:", newItem);
+  const handleEditFood = (item: FoodItem) => {
+    setEditingItem(item);
+    setModalOpen(true);
   };
 
   const handleDeleteFood = (item: FoodItem) => {
@@ -189,7 +210,7 @@ export default function DashboardPage() {
                 <FoodItemCard
                   key={item.id}
                   item={item}
-                  onEdit={(item) => console.log("Edit:", item)}
+                  onEdit={handleEditFood}
                   onDelete={handleDeleteFood}
                 />
               ))}
@@ -200,8 +221,19 @@ export default function DashboardPage() {
 
       <AddFoodModal
         open={modalOpen}
-        onOpenChange={setModalOpen}
+        onOpenChange={(open) => {
+          setModalOpen(open);
+          if (!open) {
+            setEditingItem(null);
+          }
+        }}
         onSave={handleSaveFood}
+        editData={editingItem ? {
+          name: editingItem.name,
+          category: editingItem.category,
+          purchaseDate: editingItem.purchaseDate,
+          expiryDate: editingItem.expiryDate,
+        } : null}
       />
     </div>
   );

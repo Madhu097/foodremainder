@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -44,14 +44,26 @@ const categories = [
 ];
 
 export function AddFoodModal({ open, onOpenChange, onSave, editData }: AddFoodModalProps) {
-  const [formData, setFormData] = useState<FoodFormData>(
-    editData || {
-      name: "",
-      category: "",
-      purchaseDate: new Date().toISOString().split("T")[0],
-      expiryDate: "",
+  const [formData, setFormData] = useState<FoodFormData>({
+    name: "",
+    category: "",
+    purchaseDate: new Date().toISOString().split("T")[0],
+    expiryDate: "",
+  });
+
+  // Update form data when editData changes
+  useEffect(() => {
+    if (editData) {
+      setFormData(editData);
+    } else {
+      setFormData({
+        name: "",
+        category: "",
+        purchaseDate: new Date().toISOString().split("T")[0],
+        expiryDate: "",
+      });
     }
-  );
+  }, [editData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
