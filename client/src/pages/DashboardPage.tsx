@@ -1,82 +1,35 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Navbar } from "@/components/Navbar";
 import { StatsCard } from "@/components/StatsCard";
 import { FoodItemCard, FoodItem } from "@/components/FoodItemCard";
 import { AddFoodModal, FoodFormData } from "@/components/AddFoodModal";
 import { Button } from "@/components/ui/button";
-import { Package, AlertCircle, XCircle, CheckCircle, Plus, LayoutGrid, List } from "lucide-react";
+import { Package, AlertCircle, XCircle, CheckCircle, Plus, LayoutGrid, List, Loader2, Info, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  // All hooks must be at the top - before any conditional returns
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  
-  //todo: remove mock functionality
-  const [foodItems, setFoodItems] = useState<FoodItem[]>([
-    {
-      id: "1",
-      name: "Fresh Milk",
-      category: "Dairy",
-      purchaseDate: "2025-10-05",
-      expiryDate: "2025-10-15",
-      status: "fresh",
-      daysLeft: 5,
-    },
-    {
-      id: "2",
-      name: "Strawberries",
-      category: "Fruits",
-      purchaseDate: "2025-10-08",
-      expiryDate: "2025-10-12",
-      status: "expiring",
-      daysLeft: 2,
-    },
-    {
-      id: "3",
-      name: "Chicken Breast",
-      category: "Meat",
-      purchaseDate: "2025-10-07",
-      expiryDate: "2025-10-13",
-      status: "expiring",
-      daysLeft: 3,
-    },
-    {
-      id: "4",
-      name: "Greek Yogurt",
-      category: "Dairy",
-      purchaseDate: "2025-10-01",
-      expiryDate: "2025-10-09",
-      status: "expired",
-      daysLeft: -1,
-    },
-    {
-      id: "5",
-      name: "Cheddar Cheese",
-      category: "Dairy",
-      purchaseDate: "2025-10-03",
-      expiryDate: "2025-10-20",
-      status: "fresh",
-      daysLeft: 10,
-    },
-    {
-      id: "6",
-      name: "Bread",
-      category: "Grains",
-      purchaseDate: "2025-10-09",
-      expiryDate: "2025-10-14",
-      status: "fresh",
-      daysLeft: 4,
-    },
-  ]);
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+  const [showFreeNotification, setShowFreeNotification] = useState(true);
+  const { toast } = useToast();
 
-  const handleSaveFood = (data: FoodFormData) => {
-    const purchaseDate = new Date(data.purchaseDate);
-    const expiryDate = new Date(data.expiryDate);
+  // Helper function to calculate item status and days left
+  const calculateItemStatus = (item: any): FoodItem => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const expiryDate = new Date(item.expiryDate);
+    expiryDate.setHours(0, 0, 0, 0);
     
     const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
@@ -87,29 +40,154 @@ export default function DashboardPage() {
       status = "expiring";
     }
 
-    if (editingItem) {
-      // Update existing item
-      const updatedItem: FoodItem = {
-        ...editingItem,
-        ...data,
-        status,
-        daysLeft,
-      };
-      setFoodItems(foodItems.map((item) => 
-        item.id === editingItem.id ? updatedItem : item
-      ));
-      console.log("Updated food item:", updatedItem);
-      setEditingItem(null);
-    } else {
-      // Add new item
-      const newItem: FoodItem = {
-        id: Date.now().toString(),
-        ...data,
-        status,
-        daysLeft,
-      };
-      setFoodItems([...foodItems, newItem]);
-      console.log("Added new food item:", newItem);
+    return {
+      ...item,
+      status,
+      daysLeft,
+    };
+  };
+
+  // Check authentication and load user's food items
+  useEffect(() => {
+    const loadUserData = async () => {
+      // Check if user is logged in
+      const userStr = localStorage.getItem("user");
+      if (!userStr) {
+        setLocation("/auth?mode=login");
+        return;
+      }
+      
+      try {
+        const user = JSON.parse(userStr);
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+
+        // Fetch user's food items
+        await fetchFoodItems(user.id);
+      } catch (err) {
+        localStorage.removeItem("user");
+        setLocation("/auth?mode=login");
+      }
+    };
+
+    loadUserData();
+  }, [setLocation]);
+
+  // Check if free notification was dismissed
+  useEffect(() => {
+    const dismissed = localStorage.getItem("freeNotificationDismissed");
+    if (dismissed === "true") {
+      setShowFreeNotification(false);
+    }
+  }, []);
+
+  const handleDismissFreeNotification = () => {
+    setShowFreeNotification(false);
+    localStorage.setItem("freeNotificationDismissed", "true");
+  };
+
+  // Fetch food items for the current user
+  const fetchFoodItems = async (userId: string) => {
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const response = await fetch(`/api/food-items/${userId}`);
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch food items");
+      }
+
+      const data = await response.json();
+      const itemsWithStatus = data.items.map(calculateItemStatus);
+      setFoodItems(itemsWithStatus);
+    } catch (err) {
+      console.error("Error fetching food items:", err);
+      setError("Failed to load your food items. Please try refreshing the page.");
+      setFoodItems([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setLocation("/");
+  };
+
+  // Show loading or nothing while checking auth
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  const handleSaveFood = async (data: FoodFormData) => {
+    if (!currentUser) return;
+
+    try {
+      if (editingItem) {
+        // Update existing item
+        const response = await fetch(`/api/food-items/${editingItem.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            ...data,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to update item");
+        }
+
+        const result = await response.json();
+        const updatedItem = calculateItemStatus(result.item);
+        
+        setFoodItems(foodItems.map((item) => 
+          item.id === editingItem.id ? updatedItem : item
+        ));
+        
+        toast({
+          title: "Updated!",
+          description: "Food item updated successfully.",
+        });
+        
+        setEditingItem(null);
+      } else {
+        // Add new item
+        const response = await fetch("/api/food-items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            ...data,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create item");
+        }
+
+        const result = await response.json();
+        const newItem = calculateItemStatus(result.item);
+        
+        setFoodItems([...foodItems, newItem]);
+        
+        toast({
+          title: "Added!",
+          description: "Food item added to your inventory.",
+        });
+      }
+      
+      setModalOpen(false);
+    } catch (err) {
+      console.error("Error saving food item:", err);
+      toast({
+        title: "Error",
+        description: "Failed to save food item. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -118,9 +196,34 @@ export default function DashboardPage() {
     setModalOpen(true);
   };
 
-  const handleDeleteFood = (item: FoodItem) => {
-    setFoodItems(foodItems.filter((i) => i.id !== item.id));
-    console.log("Deleted food item:", item);
+  const handleDeleteFood = async (item: FoodItem) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch(`/api/food-items/${item.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete item");
+      }
+
+      setFoodItems(foodItems.filter((i) => i.id !== item.id));
+      
+      toast({
+        title: "Deleted!",
+        description: "Food item removed from your inventory.",
+      });
+    } catch (err) {
+      console.error("Error deleting food item:", err);
+      toast({
+        title: "Error",
+        description: "Failed to delete food item. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const stats = {
@@ -133,14 +236,35 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar
-        isAuthenticated={true}
-        onLogoutClick={() => {
-          console.log("Logout clicked");
-          setLocation("/");
-        }}
+        isAuthenticated={isAuthenticated}
+        onLogoutClick={handleLogout}
       />
 
       <main className="flex-1">
+        {showFreeNotification && (
+          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 dark:from-blue-950/30 dark:via-indigo-950/30 dark:to-blue-950/30 border-b border-blue-200 dark:border-blue-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    🎉 You're using Food Reminder Free Edition
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                    Enjoying the service? Consider upgrading for premium features like unlimited items, advanced analytics, and priority support.
+                  </p>
+                </div>
+                <button
+                  onClick={handleDismissFreeNotification}
+                  className="flex-shrink-0 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
+                  aria-label="Dismiss notification"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -191,7 +315,19 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {foodItems.length === 0 ? (
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="text-muted-foreground">Loading your food inventory...</p>
+            </div>
+          ) : foodItems.length === 0 ? (
             <div className="text-center py-16">
               <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2">No food items yet</h3>

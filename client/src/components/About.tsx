@@ -58,10 +58,10 @@ export function About() {
           transition={{ duration: 0.6 }}
         >
           <h2 className="text-4xl md:text-5xl font-bold">
-            Why Choose FoodSaver?
+            Why Choose Food Reminder?
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            The average household wastes over $1,500 worth of food each year. FoodSaver helps you take control.
+            The average household wastes over $1,500 worth of food each year. Food Reminder helps you take control.
           </p>
         </motion.div>
 
@@ -101,39 +101,6 @@ export function About() {
           ))}
         </motion.div>
 
-        <motion.div
-          className="mt-16 text-center"
-          initial={{ opacity: 0, scale: 0.9 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-        >
-          <div className="inline-flex flex-wrap items-center justify-center gap-8 p-8 bg-card/80 backdrop-blur-sm rounded-2xl border shadow-lg">
-            {[
-              { value: "10,000+", label: "Active Users" },
-              { value: "$2M+", label: "Food Saved" },
-              { value: "50K+", label: "Items Tracked" },
-            ].map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                className="text-center"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.4 + i * 0.1 }}
-              >
-                <motion.div
-                  className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent"
-                  whileHover={{ scale: 1.1 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  {stat.value}
-                </motion.div>
-                <div className="text-sm text-muted-foreground mt-2">{stat.label}</div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
       </div>
     </section>
   );

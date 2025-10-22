@@ -29,6 +29,8 @@ export interface FoodFormData {
   category: string;
   purchaseDate: string;
   expiryDate: string;
+  quantity?: string;
+  notes?: string;
 }
 
 const categories = [
@@ -49,6 +51,8 @@ export function AddFoodModal({ open, onOpenChange, onSave, editData }: AddFoodMo
     category: "",
     purchaseDate: new Date().toISOString().split("T")[0],
     expiryDate: "",
+    quantity: "",
+    notes: "",
   });
 
   // Update form data when editData changes
@@ -61,6 +65,8 @@ export function AddFoodModal({ open, onOpenChange, onSave, editData }: AddFoodMo
         category: "",
         purchaseDate: new Date().toISOString().split("T")[0],
         expiryDate: "",
+        quantity: "",
+        notes: "",
       });
     }
   }, [editData]);
@@ -74,6 +80,8 @@ export function AddFoodModal({ open, onOpenChange, onSave, editData }: AddFoodMo
       category: "",
       purchaseDate: new Date().toISOString().split("T")[0],
       expiryDate: "",
+      quantity: "",
+      notes: "",
     });
   };
 
@@ -146,6 +154,28 @@ export function AddFoodModal({ open, onOpenChange, onSave, editData }: AddFoodMo
                 data-testid="input-expiry-date"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quantity">Quantity (Optional)</Label>
+            <Input
+              id="quantity"
+              placeholder="e.g., 1 Liter, 500g, 2 pieces"
+              value={formData.quantity || ""}
+              onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+              data-testid="input-quantity"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Input
+              id="notes"
+              placeholder="e.g., Organic, Low-fat, Store in fridge"
+              value={formData.notes || ""}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              data-testid="input-notes"
+            />
           </div>
 
           <div className="flex gap-3 pt-4">

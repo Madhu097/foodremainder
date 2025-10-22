@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Leaf, Menu, X } from "lucide-react";
+import { Leaf, Menu, X, User } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -36,21 +36,29 @@ export function Navbar({
             >
               <Leaf className="h-6 w-6 text-primary" />
             </motion.div>
-            <span className="text-xl font-bold">FoodSaver</span>
+            <span className="text-xl font-bold">Food Reminder</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-6">
-            <Link href="#about" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md" data-testid="link-about">
-              About
-            </Link>
             {isAuthenticated && (
-              <Link href="/dashboard" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md" data-testid="link-dashboard">
-                Dashboard
-              </Link>
+              <>
+                <Link href="/dashboard" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md" data-testid="link-dashboard">
+                  Dashboard
+                </Link>
+                <Link href="/profile" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md flex items-center gap-2" data-testid="link-profile">
+                  <User className="w-4 h-4" />
+                  Profile
+                </Link>
+              </>
             )}
           </div>
 
           <div className="hidden md:flex items-center gap-3">
+            {!isAuthenticated && (
+              <Link href="#about" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md" data-testid="link-about">
+                About
+              </Link>
+            )}
             <ThemeToggle />
             {!isAuthenticated ? (
               <>
@@ -90,13 +98,21 @@ export function Navbar({
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <Link href="#about" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-about-mobile">
-                About
-              </Link>
-              {isAuthenticated && (
-                <Link href="/dashboard" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-dashboard-mobile">
-                  Dashboard
+              {!isAuthenticated && (
+                <Link href="#about" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-about-mobile">
+                  About
                 </Link>
+              )}
+              {isAuthenticated && (
+                <>
+                  <Link href="/dashboard" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-dashboard-mobile">
+                    Dashboard
+                  </Link>
+                  <Link href="/profile" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2 flex items-center gap-2" data-testid="link-profile-mobile">
+                    <User className="w-4 h-4" />
+                    Profile
+                  </Link>
+                </>
               )}
               <div className="pt-2 space-y-2">
                 {!isAuthenticated ? (

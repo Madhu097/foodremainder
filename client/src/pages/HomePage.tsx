@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
@@ -7,13 +7,30 @@ import { Footer } from "@/components/Footer";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const user = localStorage.getItem("user");
+    if (user) {
+      setIsAuthenticated(true);
+      // Redirect to dashboard if already logged in
+      setLocation("/dashboard");
+    }
+  }, [setLocation]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    setIsAuthenticated(false);
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar
-        isAuthenticated={false}
+        isAuthenticated={isAuthenticated}
         onLoginClick={() => setLocation("/auth?mode=login")}
         onRegisterClick={() => setLocation("/auth?mode=register")}
+        onLogoutClick={handleLogout}
       />
       <main className="flex-1">
         <Hero

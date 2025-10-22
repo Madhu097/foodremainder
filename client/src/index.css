@@ -14,23 +14,23 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 0 0% 100%;
+  --background: 40 20% 97%;
 
   --foreground: 0 0% 13%;
 
-  --border: 0 0% 89%;
+  --border: 40 15% 85%;
 
-  --card: 0 0% 98%;
+  --card: 40 25% 95%;
 
   --card-foreground: 0 0% 13%;
 
-  --card-border: 0 0% 93%;
+  --card-border: 40 20% 88%;
 
-  --sidebar: 0 0% 96%;
+  --sidebar: 40 20% 93%;
 
   --sidebar-foreground: 0 0% 13%;
 
-  --sidebar-border: 0 0% 91%;
+  --sidebar-border: 40 15% 87%;
 
   --sidebar-primary: 142 76% 36%;
 
@@ -42,25 +42,25 @@
 
   --sidebar-ring: 142 76% 36%;
 
-  --popover: 0 0% 95%;
+  --popover: 40 25% 94%;
 
   --popover-foreground: 0 0% 13%;
 
-  --popover-border: 0 0% 89%;
+  --popover-border: 40 20% 85%;
 
   --primary: 142 76% 36%;
 
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 0% 92%;
+  --secondary: 40 20% 90%;
 
   --secondary-foreground: 0 0% 13%;
 
-  --muted: 0 0% 94%;
+  --muted: 40 20% 92%;
 
-  --muted-foreground: 0 0% 45%;
+  --muted-foreground: 0 0% 40%;
 
-  --accent: 142 8% 93%;
+  --accent: 142 15% 90%;
 
   --accent-foreground: 0 0% 13%;
 
@@ -68,7 +68,7 @@
 
   --destructive-foreground: 0 0% 100%;
 
-  --input: 0 0% 80%;
+  --input: 40 15% 82%;
   --ring: 142 76% 36%;
   --chart-1: 142 76% 36%;
   --chart-2: 38 92% 50%;
@@ -328,5 +328,21 @@
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
+  }
+
+  /* Floating animation for background orbs */
+  @keyframes float {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+    }
+    25% {
+      transform: translate(30px, -20px) scale(1.05);
+    }
+    50% {
+      transform: translate(-20px, 20px) scale(0.95);
+    }
+    75% {
+      transform: translate(20px, 10px) scale(1.02);
+    }
   }
 }

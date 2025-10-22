@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Apple } from "lucide-react";
+import { Edit, Trash2, Apple, Milk, Carrot, Beef, Fish, Wheat, Coffee, Cookie, Salad } from "lucide-react";
 
 export interface FoodItem {
   id: string;
@@ -40,6 +40,34 @@ export function FoodItemCard({ item, onEdit, onDelete }: FoodItemCardProps) {
 
   const config = statusConfig[item.status];
 
+  // Get category-specific icon and color
+  const getCategoryIcon = () => {
+    const category = item.category.toLowerCase();
+    
+    switch (category) {
+      case "dairy":
+        return { Icon: Milk, color: "bg-blue-100 dark:bg-blue-900/20", iconColor: "text-blue-600 dark:text-blue-400" };
+      case "fruits":
+        return { Icon: Apple, color: "bg-red-100 dark:bg-red-900/20", iconColor: "text-red-600 dark:text-red-400" };
+      case "vegetables":
+        return { Icon: Carrot, color: "bg-orange-100 dark:bg-orange-900/20", iconColor: "text-orange-600 dark:text-orange-400" };
+      case "meat":
+        return { Icon: Beef, color: "bg-rose-100 dark:bg-rose-900/20", iconColor: "text-rose-600 dark:text-rose-400" };
+      case "seafood":
+        return { Icon: Fish, color: "bg-cyan-100 dark:bg-cyan-900/20", iconColor: "text-cyan-600 dark:text-cyan-400" };
+      case "grains":
+        return { Icon: Wheat, color: "bg-amber-100 dark:bg-amber-900/20", iconColor: "text-amber-600 dark:text-amber-400" };
+      case "beverages":
+        return { Icon: Coffee, color: "bg-brown-100 dark:bg-brown-900/20", iconColor: "text-brown-600 dark:text-brown-400" };
+      case "snacks":
+        return { Icon: Cookie, color: "bg-yellow-100 dark:bg-yellow-900/20", iconColor: "text-yellow-600 dark:text-yellow-400" };
+      default:
+        return { Icon: Salad, color: "bg-green-100 dark:bg-green-900/20", iconColor: "text-green-600 dark:text-green-400" };
+    }
+  };
+
+  const { Icon: CategoryIcon, color: iconBgColor, iconColor } = getCategoryIcon();
+
   const getDaysLeftText = () => {
     if (item.status === "expired") {
       return `Expired ${Math.abs(item.daysLeft)} day${Math.abs(item.daysLeft) === 1 ? "" : "s"} ago`;
@@ -54,8 +82,8 @@ export function FoodItemCard({ item, onEdit, onDelete }: FoodItemCardProps) {
       <CardContent className="p-6">
         <div className="space-y-4">
           <div className="flex items-start gap-3">
-            <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Apple className="h-6 w-6 text-primary" />
+            <div className={`h-12 w-12 ${iconBgColor} rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110`}>
+              <CategoryIcon className={`h-6 w-6 ${iconColor}`} />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-lg truncate" data-testid={`text-food-name-${item.id}`}>

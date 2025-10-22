@@ -79,15 +79,6 @@ export function Hero({ onGetStartedClick, onLearnMoreClick }: HeroProps) {
             animate="visible"
           >
             <motion.div className="space-y-4" variants={itemVariants}>
-              <motion.div
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-sm font-medium text-primary mb-4"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5 }}
-              >
-                <Sparkles className="h-4 w-4" />
-                AI-Powered Food Tracking
-              </motion.div>
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight">
                 Never Let Food
                 <span className="block bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">

@@ -1,13 +1,389 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { insertUserSchema, loginSchema, insertFoodItemSchema } from "@shared/schema";
+import { z } from "zod";
+import { createHash } from "crypto";
+import { emailService } from "./emailService";
+import { whatsappService } from "./whatsappService";
+import { notificationChecker } from "./notificationChecker";
+
+// Simple password hashing (in production, use bcrypt)
+function hashPassword(password: string): string {
+  return createHash("sha256").update(password).digest("hex");
+}
+
+function verifyPassword(password: string, hash: string): boolean {
+  return hashPassword(password) === hash;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // Test endpoint to verify API is working
+  app.get("/api/health", (req: Request, res: Response) => {
+    res.status(200).json({ status: "ok", message: "API is working" });
+  });
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  // Register new user
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
+    console.log("[Auth] Registration request received");
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      
+      // Check if username already exists
+      const existingUsername = await storage.getUserByUsername(validatedData.username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+      
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(validatedData.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      
+      // Check if mobile already exists
+      const existingMobile = await storage.getUserByMobile(validatedData.mobile);
+      if (existingMobile) {
+        return res.status(400).json({ message: "Mobile number already registered" });
+      }
+      
+      // Hash password
+      const hashedPassword = hashPassword(validatedData.password);
+      
+      // Create user
+      const user = await storage.createUser({
+        ...validatedData,
+        password: hashedPassword,
+      });
+      
+      // Don't send password back
+      const { password, ...userWithoutPassword } = user;
+      
+      res.status(201).json({ 
+        message: "Registration successful",
+        user: userWithoutPassword 
+      });
+    } catch (error) {
+      console.error("[Auth] Registration error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error",
+          errors: error.errors 
+        });
+      }
+      return res.status(500).json({ 
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Login user
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    console.log("[Auth] Login request received");
+    try {
+      const validatedData = loginSchema.parse(req.body);
+      
+      // Find user by email or mobile
+      const user = await storage.getUserByEmailOrMobile(validatedData.identifier);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Verify password
+      const isValidPassword = verifyPassword(validatedData.password, user.password);
+      
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Don't send password back
+      const { password, ...userWithoutPassword } = user;
+      
+      res.status(200).json({ 
+        message: "Login successful",
+        user: userWithoutPassword 
+      });
+    } catch (error) {
+      console.error("[Auth] Login error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error",
+          errors: error.errors 
+        });
+      }
+      return res.status(500).json({ 
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Get current user (check if logged in)
+  app.get("/api/auth/user", async (req: Request, res: Response) => {
+    // In a real app, you'd get userId from session/token
+    // For now, return null as we don't have session management yet
+    res.status(200).json({ user: null });
+  });
+
+  // Reset password (forgot password)
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { identifier, newPassword } = req.body;
+      
+      if (!identifier || !newPassword) {
+        return res.status(400).json({ message: "Email/mobile and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      // Find user by email or mobile
+      const user = await storage.getUserByEmailOrMobile(identifier);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Hash new password
+      const hashedPassword = hashPassword(newPassword);
+      
+      // Update password
+      const updated = await storage.updateUserPassword(user.id, hashedPassword);
+      
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to update password" });
+      }
+
+      res.status(200).json({ message: "Password reset successfully" });
+    } catch (error) {
+      console.error("[Auth] Reset password error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Change password (for logged-in users)
+  app.post("/api/auth/change-password", async (req: Request, res: Response) => {
+    try {
+      const { userId, currentPassword, newPassword } = req.body;
+      
+      if (!userId || !currentPassword || !newPassword) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters" });
+      }
+
+      // Get user
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify current password
+      const isValidPassword = verifyPassword(currentPassword, user.password);
+      
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      // Hash new password
+      const hashedPassword = hashPassword(newPassword);
+      
+      // Update password
+      const updated = await storage.updateUserPassword(userId, hashedPassword);
+      
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to update password" });
+      }
+
+      res.status(200).json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("[Auth] Change password error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ===== FOOD ITEMS ROUTES =====
+  
+  // Get all food items for a user
+  app.get("/api/food-items/:userId", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const items = await storage.getFoodItemsByUserId(userId);
+      res.status(200).json({ items });
+    } catch (error) {
+      console.error("[FoodItems] Get items error:", error);
+      res.status(500).json({ message: "Failed to fetch food items" });
+    }
+  });
+
+  // Create new food item
+  app.post("/api/food-items", async (req: Request, res: Response) => {
+    try {
+      const { userId, ...itemData } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const validatedData = insertFoodItemSchema.parse(itemData);
+      const item = await storage.createFoodItem(userId, validatedData);
+      
+      res.status(201).json({ message: "Food item created", item });
+    } catch (error) {
+      console.error("[FoodItems] Create item error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error",
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: "Failed to create food item" });
+    }
+  });
+
+  // Update food item
+  app.put("/api/food-items/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { userId, ...updateData } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const item = await storage.updateFoodItem(id, userId, updateData);
+      
+      if (!item) {
+        return res.status(404).json({ message: "Food item not found or unauthorized" });
+      }
+      
+      res.status(200).json({ message: "Food item updated", item });
+    } catch (error) {
+      console.error("[FoodItems] Update item error:", error);
+      res.status(500).json({ message: "Failed to update food item" });
+    }
+  });
+
+  // Delete food item
+  app.delete("/api/food-items/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const success = await storage.deleteFoodItem(id, userId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Food item not found or unauthorized" });
+      }
+      
+      res.status(200).json({ message: "Food item deleted" });
+    } catch (error) {
+      console.error("[FoodItems] Delete item error:", error);
+      res.status(500).json({ message: "Failed to delete food item" });
+    }
+  });
+
+  // ===== NOTIFICATION ROUTES =====
+
+  // Get notification preferences for a user
+  app.get("/api/notifications/preferences/:userId", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.status(200).json({
+        emailNotifications: user.emailNotifications === "true",
+        whatsappNotifications: user.whatsappNotifications === "true",
+        notificationDays: parseInt(user.notificationDays || "3"),
+        servicesConfigured: {
+          email: emailService.isConfigured(),
+          whatsapp: whatsappService.isConfigured(),
+        },
+      });
+    } catch (error) {
+      console.error("[Notifications] Get preferences error:", error);
+      res.status(500).json({ message: "Failed to fetch notification preferences" });
+    }
+  });
+
+  // Update notification preferences for a user
+  app.put("/api/notifications/preferences/:userId", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { emailNotifications, whatsappNotifications, notificationDays } = req.body;
+
+      const preferences: any = {};
+      if (typeof emailNotifications === "boolean") {
+        preferences.emailNotifications = emailNotifications ? "true" : "false";
+      }
+      if (typeof whatsappNotifications === "boolean") {
+        preferences.whatsappNotifications = whatsappNotifications ? "true" : "false";
+      }
+      if (typeof notificationDays === "number" && notificationDays > 0) {
+        preferences.notificationDays = notificationDays.toString();
+      }
+
+      const updated = await storage.updateNotificationPreferences(userId, preferences);
+
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.status(200).json({ 
+        message: "Notification preferences updated successfully",
+        preferences 
+      });
+    } catch (error) {
+      console.error("[Notifications] Update preferences error:", error);
+      res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
+  // Test notification for a user (send notification immediately)
+  app.post("/api/notifications/test/:userId", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const result = await notificationChecker.testNotification(userId);
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("[Notifications] Test notification error:", error);
+      res.status(500).json({ message: "Failed to send test notification" });
+    }
+  });
+
+  // Manual trigger to check all users and send notifications
+  app.post("/api/notifications/check-all", async (req: Request, res: Response) => {
+    try {
+      const results = await notificationChecker.checkAndNotifyAll();
+      res.status(200).json({
+        message: "Notification check completed",
+        notificationsSent: results.length,
+        results,
+      });
+    } catch (error) {
+      console.error("[Notifications] Check all error:", error);
+      res.status(500).json({ message: "Failed to check notifications" });
+    }
+  });
 
   const httpServer = createServer(app);
 

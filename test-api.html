@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            max-width: 600px; 
+            margin: 0 auto; 
+        }
+        button { 
+            padding: 10px 20px; 
+            margin: 10px 5px; 
+            cursor: pointer; 
+            background: #22c55e;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover { background: #16a34a; }
+        pre { 
+            background: #f5f5f5; 
+            padding: 15px; 
+            border-radius: 5px; 
+            overflow-x: auto;
+        }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>API Test Page</h1>
+    <p>Test your authentication API directly</p>
+
+    <div>
+        <button onclick="testHealth()">Test Health Check</button>
+        <button onclick="testRegister()">Test Register</button>
+        <button onclick="testLogin()">Test Login</button>
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'success';
+            div.innerHTML = `<h3>${message}</h3>`;
+            output.appendChild(div);
+        }
+
+        function logJSON(title, data) {
+            const div = document.createElement('div');
+            div.innerHTML = `<h4>${title}</h4><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            output.appendChild(div);
+        }
+
+        async function testHealth() {
+            output.innerHTML = '';
+            log('Testing /api/health...');
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                log(`✅ Success! Status: ${response.status}`);
+                logJSON('Response:', data);
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, true);
+            }
+        }
+
+        async function testRegister() {
+            output.innerHTML = '';
+            log('Testing /api/auth/register...');
+            
+            const testUser = {
+                username: 'testuser' + Date.now(),
+                email: `test${Date.now()}@example.com`,
+                mobile: '+1234567890',
+                password: 'password123'
+            };
+
+            logJSON('Request:', testUser);
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testUser)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Success! Status: ${response.status}`);
+                } else {
+                    log(`⚠️ Error response: ${response.status}`, true);
+                }
+                
+                logJSON('Response:', data);
+                
+                if (data.user) {
+                    window.testUser = testUser;
+                    log('✅ User data saved to window.testUser for login test');
+                }
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, true);
+                console.error(err);
+            }
+        }
+
+        async function testLogin() {
+            output.innerHTML = '';
+            log('Testing /api/auth/login...');
+
+            if (!window.testUser) {
+                log('⚠️ No test user found. Run Register test first!', true);
+                return;
+            }
+
+            const loginData = {
+                identifier: window.testUser.email,
+                password: window.testUser.password
+            };
+
+            logJSON('Request:', loginData);
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(loginData)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Success! Status: ${response.status}`);
+                } else {
+                    log(`⚠️ Error response: ${response.status}`, true);
+                }
+                
+                logJSON('Response:', data);
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, true);
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>
