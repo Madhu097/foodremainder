@@ -22,17 +22,29 @@ class WhatsAppService {
       return false;
     }
 
+    // Validate Twilio Account SID format
+    if (!accountSid.startsWith('AC')) {
+      console.warn("[WhatsAppService] Invalid Twilio Account SID format (must start with 'AC'). WhatsApp notifications will be disabled.");
+      return false;
+    }
+
     this.config = {
       accountSid,
       authToken,
       fromNumber,
     };
 
-    // Create Twilio client
-    this.client = twilio(this.config.accountSid, this.config.authToken);
-
-    console.log("[WhatsAppService] WhatsApp service initialized successfully");
-    return true;
+    try {
+      // Create Twilio client
+      this.client = twilio(this.config.accountSid, this.config.authToken);
+      console.log("[WhatsAppService] WhatsApp service initialized successfully");
+      return true;
+    } catch (error) {
+      console.error("[WhatsAppService] Failed to initialize Twilio client:", error instanceof Error ? error.message : 'Unknown error');
+      this.client = null;
+      this.config = null;
+      return false;
+    }
   }
 
   isConfigured(): boolean {
