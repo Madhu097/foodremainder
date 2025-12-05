@@ -43,8 +43,13 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  // Initialize notification services
+// Initialize services immediately
+let servicesInitialized = false;
+
+function initializeServices() {
+  if (servicesInitialized) return;
+  servicesInitialized = true;
+  
   log("Initializing notification services...");
   const emailInitialized = emailService.initialize();
   const whatsappInitialized = whatsappService.initialize();
@@ -60,6 +65,13 @@ app.use((req, res, next) => {
   } else {
     log("⚠ WhatsApp notifications disabled (configure TWILIO_* environment variables)");
   }
+}
+
+async function setupApp() {
+  initializeServices();
+
+async function setupApp() {
+  initializeServices();
 
   // Register API routes FIRST
   const server = await registerRoutes(app);
@@ -87,12 +99,21 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
+  return server;
+}
+
+// Only start server if not in Vercel
+if (!process.env.VERCEL) {
+  setupApp().then((server) => {
+    const port = parseInt(process.env.PORT || '5000', 10);
+    server.listen(port, "0.0.0.0", () => {
+      log(`serving on port ${port}`);
+    });
   });
-})();
+} else {
+  // For Vercel, initialize app immediately
+  setupApp();
+}
+
+// Export for Vercel serverless
+export default app;
