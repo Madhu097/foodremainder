@@ -43,8 +43,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize services immediately
+// Initialize services immediately (only once)
 let servicesInitialized = false;
+let appInitialized = false;
 
 function initializeServices() {
   if (servicesInitialized) return;
@@ -68,9 +69,9 @@ function initializeServices() {
 }
 
 async function setupApp() {
-  initializeServices();
-
-async function setupApp() {
+  if (appInitialized) return null;
+  appInitialized = true;
+  
   initializeServices();
 
   // Register API routes FIRST
