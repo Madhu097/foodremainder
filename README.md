@@ -12,7 +12,8 @@ A smart food inventory management system that helps you track expiry dates and p
 
 - 📱 **User Authentication** - Secure registration and login system
 - 🍎 **Food Inventory** - Track all your food items with purchase and expiry dates
-- 🔔 **Smart Notifications** - Email and WhatsApp reminders before food expires
+- 🔔 **Smart Notifications** - Email (Resend), SMS & WhatsApp (Twilio), Telegram (Free!)
+- ⏰ **Auto Scheduler** - Automatic daily notification checks
 - 📊 **Dashboard** - Visual overview of your food inventory
 - 🔥 **Firebase Integration** - Cloud-based persistent storage
 - 🌙 **Dark Mode** - Beautiful dark theme for comfortable viewing
@@ -105,22 +106,39 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 
 For detailed instructions, see [FIREBASE_SETUP.md](./FIREBASE_SETUP.md)
 
-### Email Notifications (Optional)
+### Notifications (Optional but Recommended!)
 
+**⚡ Quick Setup (3 minutes):**  
+See [NOTIFICATIONS_QUICKSTART.md](./NOTIFICATIONS_QUICKSTART.md) for the fastest way to get notifications working!
+
+**📧 Email with Resend (FREE - Recommended):**
 ```env
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASSWORD=your-app-password
-EMAIL_FROM=Food Reminder <noreply@foodreminder.app>
+EMAIL_SERVICE=resend
+RESEND_API_KEY=re_your_api_key_here
+EMAIL_FROM=Food Reminder <onboarding@resend.dev>
 ```
 
-### WhatsApp Notifications (Optional)
-
+**📱 SMS with Twilio:**
 ```env
 TWILIO_ACCOUNT_SID=your-account-sid
 TWILIO_AUTH_TOKEN=your-auth-token
+TWILIO_SMS_FROM=+15551234567
+```
+
+**💬 WhatsApp with Twilio:**
+```env
 TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+```
+
+**✈️ Telegram (Free & Unlimited):**
+```env
+TELEGRAM_BOT_TOKEN=your_bot_token
+```
+
+**⏰ Scheduler:**
+```env
+NOTIFICATION_SCHEDULE=0 9 * * *  # Daily at 9 AM
+TIMEZONE=UTC
 ```
 
 ---
@@ -129,12 +147,15 @@ TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 
 | Document | Description |
 |----------|-------------|
+| **[NOTIFICATIONS_QUICKSTART.md](./NOTIFICATIONS_QUICKSTART.md)** | **⚡ 3-min notification setup** |
+| [COMPLETE_NOTIFICATION_GUIDE.md](./COMPLETE_NOTIFICATION_GUIDE.md) | Complete notification reference |
+| **[TELEGRAM_SETUP_GUIDE.md](./TELEGRAM_SETUP_GUIDE.md)** | **✈️ Telegram setup guide** |
+| **[FREE_EMAIL_SETUP_GUIDE.md](./FREE_EMAIL_SETUP_GUIDE.md)** | **Free email service options** |
 | [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) | Complete Firebase setup guide |
 | [FIREBASE_TROUBLESHOOTING.md](./FIREBASE_TROUBLESHOOTING.md) | Common issues and solutions |
 | [DATA_STORAGE_GUIDE.md](./DATA_STORAGE_GUIDE.md) | Understanding data storage |
 | [HOW_TO_RUN.md](./HOW_TO_RUN.md) | Detailed running instructions |
 | [USER_GUIDE.md](./USER_GUIDE.md) | User manual |
-| [NOTIFICATION_SETUP.md](./NOTIFICATION_SETUP.md) | Email/WhatsApp setup |
 
 ---
 
@@ -177,19 +198,44 @@ The application uses **Firebase Firestore** for data storage:
 
 ## 🔔 Notifications
 
-The app supports multiple notification channels:
+### Multi-Channel Notifications
 
-### Email Notifications
-- Sent via SMTP (Gmail, SendGrid, etc.)
-- Customizable reminder days
-- HTML formatted emails
+Never miss expiring food with notifications via:
 
-### WhatsApp Notifications
-- Powered by Twilio
-- Instant delivery
-- Rich message formatting
+#### 📧 Email
+- **Resend** (Recommended): 100 emails/day FREE, no credit card!
+- **Gmail**: Use your existing Gmail account
+- **Other SMTP**: SendGrid, Brevo, Mailgun, etc.
+- Beautiful HTML templates with food item details
 
-Configure notification preferences in your user settings dashboard.
+#### 📱 SMS
+- **Twilio**: $15 FREE credit (~2,000 messages)
+- Text message alerts for urgent expirations
+- Works on any mobile phone
+
+#### 💬 WhatsApp
+- **Twilio Sandbox**: Unlimited FREE messages for testing
+- Instant delivery to WhatsApp
+- Rich formatting with emojis
+
+#### ✈️ Telegram
+- **Telegram Bot**: Completely FREE and unlimited!
+- Private and secure messaging
+- Zero cost solution for notifications
+
+### ⏰ Automatic Scheduling
+
+- Set-and-forget: Runs automatically daily
+- Customizable time (e.g., 9 AM, 6 PM)
+- Timezone-aware notifications
+- Cron-based scheduling for flexibility
+
+### ⚙️ User Customization
+
+- Enable/disable each notification channel
+- Set notification days (e.g., 3 days before expiry)
+- Test notifications anytime
+- Per-user preferences
 
 ---
 
@@ -207,8 +253,11 @@ Configure notification preferences in your user settings dashboard.
 - **Express** - Web framework
 - **Firebase Admin SDK** - Database
 - **Passport** - Authentication
-- **Nodemailer** - Email service
-- **Twilio** - WhatsApp service
+- **Resend** - Email service (recommended)
+- **Nodemailer** - SMTP email fallback
+- **Twilio** - SMS & WhatsApp service
+- **node-telegram-bot-api** - Telegram integration
+- **Node-cron** - Task scheduling
 
 ### Build Tools
 - **Vite** - Frontend bundler

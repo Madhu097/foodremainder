@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Bell, Mail, MessageCircle, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Bell, Mail, MessageCircle, Loader2, CheckCircle2, AlertCircle, Send, Globe, Moon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { API_BASE_URL } from "@/lib/api";
@@ -12,10 +12,17 @@ import { API_BASE_URL } from "@/lib/api";
 interface NotificationPreferences {
   emailNotifications: boolean;
   whatsappNotifications: boolean;
+  telegramNotifications: boolean;
+  browserNotifications: boolean;
+  telegramChatId?: string;
   notificationDays: number;
+  quietHoursStart?: string | null;
+  quietHoursEnd?: string | null;
   servicesConfigured?: {
     email: boolean;
     whatsapp: boolean;
+    telegram: boolean;
+    push: boolean;
   };
 }
 
@@ -27,16 +34,36 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     emailNotifications: true,
     whatsappNotifications: false,
+    telegramNotifications: false,
+    browserNotifications: false,
+    telegramChatId: "",
     notificationDays: 3,
+    quietHoursStart: "",
+    quietHoursEnd: "",
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [botUsername, setBotUsername] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchPreferences();
+    fetchBotConfig();
   }, [userId]);
+
+  const fetchBotConfig = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/telegram-config`);
+      if (response.ok) {
+        const data = await response.json();
+        setBotUsername(data.botUsername);
+      }
+    } catch (error) {
+      console.error("Error fetching bot config:", error);
+    }
+  };
 
   const fetchPreferences = async () => {
     setIsLoading(true);
@@ -48,7 +75,11 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
         throw new Error("Failed to fetch preferences");
       }
       const data = await response.json();
-      setPreferences(data);
+      setPreferences({
+        ...data,
+        quietHoursStart: data.quietHoursStart || "",
+        quietHoursEnd: data.quietHoursEnd || "",
+      });
     } catch (error) {
       console.error("Error fetching notification preferences:", error);
       toast({
@@ -61,6 +92,70 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
     }
   };
 
+  const subscribeToPush = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      toast({ title: "Not Supported", description: "Push notifications are not supported in this browser.", variant: "destructive" });
+      return false;
+    }
+
+    try {
+      setIsSubscribing(true);
+      const register = await navigator.serviceWorker.register('/sw.js');
+
+      // Wait for service worker to be ready
+      await navigator.serviceWorker.ready;
+
+      const response = await fetch(`${API_BASE_URL}/api/notifications/vapid-public-key`);
+      const { publicKey } = await response.json();
+
+      // Convert base64 string to Uint8Array for subscribe options
+      const urlBase64ToUint8Array = (base64String: string) => {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+          .replace(/\-/g, '+')
+          .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      };
+
+      const convertedVapidKey = urlBase64ToUint8Array(publicKey);
+
+      const subscription = await register.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedVapidKey
+      });
+
+      await fetch(`${API_BASE_URL}/api/notifications/subscribe`, {
+        method: 'POST',
+        body: JSON.stringify({ userId, subscription }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Push subscription error:", error);
+      toast({ title: "Subscription Failed", description: "Could not subscribe to push notifications. Check permissions.", variant: "destructive" });
+      return false;
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) {
+      const success = await subscribeToPush();
+      if (success) {
+        setPreferences({ ...preferences, browserNotifications: true });
+      }
+    } else {
+      setPreferences({ ...preferences, browserNotifications: false });
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -70,7 +165,12 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
         body: JSON.stringify({
           emailNotifications: preferences.emailNotifications,
           whatsappNotifications: preferences.whatsappNotifications,
+          telegramNotifications: preferences.telegramNotifications,
+          browserNotifications: preferences.browserNotifications,
+          telegramChatId: preferences.telegramChatId,
           notificationDays: preferences.notificationDays,
+          quietHoursStart: preferences.quietHoursStart || null,
+          quietHoursEnd: preferences.quietHoursEnd || null,
         }),
         credentials: "include",
       });
@@ -201,6 +301,36 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             />
           </div>
 
+          {/* Browser Notifications */}
+          <div className="flex items-start justify-between space-x-4 p-4 rounded-lg bg-muted/50">
+            <div className="flex items-start space-x-3 flex-1">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20 mt-1">
+                <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="browser-notifications" className="text-base font-semibold cursor-pointer">
+                    Browser Notifications
+                  </Label>
+                  {preferences.servicesConfigured?.push ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Receive push notifications in your browser
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="browser-notifications"
+              checked={preferences.browserNotifications}
+              onCheckedChange={handlePushToggle}
+              disabled={isSubscribing}
+            />
+          </div>
+
           {/* WhatsApp Notifications */}
           <div className="flex items-start justify-between space-x-4 p-4 rounded-lg bg-muted/50">
             <div className="flex items-start space-x-3 flex-1">
@@ -236,6 +366,124 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
               }
               disabled={!preferences.servicesConfigured?.whatsapp}
             />
+          </div>
+
+          {/* Telegram Notifications */}
+          <div className="flex flex-col space-y-4 p-4 rounded-lg bg-muted/50">
+            <div className="flex items-start justify-between space-x-4">
+              <div className="flex items-start space-x-3 flex-1">
+                <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/20 mt-1">
+                  <Send className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="telegram-notifications" className="text-base font-semibold cursor-pointer">
+                      Telegram Notifications
+                    </Label>
+                    {preferences.servicesConfigured?.telegram ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Receive expiry alerts via Telegram bot
+                    {!preferences.servicesConfigured?.telegram && (
+                      <span className="block text-amber-600 dark:text-amber-500 mt-1">
+                        ⚠️ Telegram service not configured on server
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="telegram-notifications"
+                checked={preferences.telegramNotifications}
+                onCheckedChange={(checked) =>
+                  setPreferences({ ...preferences, telegramNotifications: checked })
+                }
+                disabled={!preferences.servicesConfigured?.telegram}
+              />
+            </div>
+
+            {/* Telegram Chat ID Connection */}
+            {preferences.telegramNotifications && preferences.servicesConfigured?.telegram && (
+              <div className="pl-12 space-y-3">
+                {preferences.telegramChatId ? (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-md">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                      Connected! (ID: {preferences.telegramChatId})
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto text-xs h-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => setPreferences({ ...preferences, telegramChatId: "" })}
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Connect your Telegram account to receive notifications.
+                    </p>
+                    {botUsername ? (
+                      <Button variant="default" size="sm" className="bg-sky-600 hover:bg-sky-700" asChild>
+                        <a href={`https://t.me/${botUsername}?start=${userId}`} target="_blank" rel="noopener noreferrer">
+                          <Send className="w-4 h-4 mr-2" />
+                          Connect Telegram
+                        </a>
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-amber-600">Loading bot information...</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Clicking the button will open Telegram. Press "Start" to link your account, then <strong>refresh this page</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Quiet Hours */}
+          <div className="flex flex-col space-y-4 p-4 rounded-lg bg-muted/50">
+            <div className="flex items-start space-x-3">
+              <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 mt-1">
+                <Moon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label className="text-base font-semibold">Quiet Hours</Label>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Don't receive notifications during these hours
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pl-12">
+              <div className="space-y-2">
+                <Label htmlFor="quiet-start" className="text-xs">Start Time</Label>
+                <Input
+                  id="quiet-start"
+                  type="time"
+                  value={preferences.quietHoursStart || ""}
+                  onChange={(e) => setPreferences({ ...preferences, quietHoursStart: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quiet-end" className="text-xs">End Time</Label>
+                <Input
+                  id="quiet-end"
+                  type="time"
+                  value={preferences.quietHoursEnd || ""}
+                  onChange={(e) => setPreferences({ ...preferences, quietHoursEnd: e.target.value })}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Notification Days Threshold */}
@@ -284,7 +532,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             <Button
               variant="outline"
               onClick={handleTestNotification}
-              disabled={isTesting || (!preferences.emailNotifications && !preferences.whatsappNotifications)}
+              disabled={isTesting || (!preferences.emailNotifications && !preferences.whatsappNotifications && !preferences.telegramNotifications && !preferences.browserNotifications)}
               className="flex-1 sm:flex-initial"
             >
               {isTesting ? (
@@ -302,7 +550,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
           </div>
 
           <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-            <strong>ℹ️ Note:</strong> Notifications are sent for items expiring within your specified timeframe. 
+            <strong>ℹ️ Note:</strong> Notifications are sent for items expiring within your specified timeframe.
             The test button will send an immediate notification if you have any expiring items.
           </div>
         </CardContent>

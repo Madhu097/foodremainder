@@ -9,7 +9,13 @@ export interface User {
   password: string;
   emailNotifications: string;
   whatsappNotifications: string;
+  telegramNotifications: string;
+  telegramChatId: string | null;
   notificationDays: string;
+  pushSubscriptions: string[]; // Array of JSON stringified PushSubscription objects
+  browserNotifications: string;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
   createdAt: string;
 }
 

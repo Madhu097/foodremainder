@@ -94,7 +94,13 @@ export class FirebaseStorage implements IStorage {
             id,
             emailNotifications: "true",
             whatsappNotifications: "false",
+            telegramNotifications: "false",
+            telegramChatId: null,
             notificationDays: "3",
+            pushSubscriptions: [],
+            browserNotifications: "false",
+            quietHoursStart: null,
+            quietHoursEnd: null,
             createdAt: new Date().toISOString(),
         };
 
@@ -116,13 +122,28 @@ export class FirebaseStorage implements IStorage {
 
     async updateNotificationPreferences(
         userId: string,
-        preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'notificationDays'>>
+        preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
     ): Promise<boolean> {
         if (!db) throw new Error("Firestore not initialized");
         try {
             await db.collection('users').doc(userId).update(preferences);
             return true;
         } catch (error) {
+            return false;
+        }
+    }
+
+    async addPushSubscription(userId: string, subscription: string): Promise<boolean> {
+        if (!db) throw new Error("Firestore not initialized");
+        try {
+            const userRef = db.collection('users').doc(userId);
+            // Use arrayUnion to add unique subscription
+            await userRef.update({
+                pushSubscriptions: require('firebase-admin').firestore.FieldValue.arrayUnion(subscription)
+            });
+            return true;
+        } catch (error) {
+            console.error("[FirebaseStorage] Failed to add push subscription:", error);
             return false;
         }
     }

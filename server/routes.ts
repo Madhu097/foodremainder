@@ -6,6 +6,8 @@ import { z } from "zod";
 import { createHash } from "crypto";
 import { emailService } from "./emailService";
 import { whatsappService } from "./whatsappService";
+import { telegramService } from "./telegramService";
+import { pushService } from "./pushService";
 import { notificationChecker } from "./notificationChecker";
 
 // Simple password hashing (in production, use bcrypt)
@@ -20,13 +22,15 @@ function verifyPassword(password: string, hash: string): boolean {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Test endpoint to verify API is working
   app.get("/api/health", (req: Request, res: Response) => {
-    res.status(200).json({ 
-      status: "ok", 
+    res.status(200).json({
+      status: "ok",
       message: "API is working",
       timestamp: new Date().toISOString(),
       services: {
         email: emailService.isConfigured(),
         whatsapp: whatsappService.isConfigured(),
+        telegram: telegramService.isConfigured(),
+        push: pushService.isConfigured(),
       },
       cors: {
         origin: req.headers.origin || 'none',
@@ -37,7 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // CORS test endpoint
   app.get("/api/test-cors", (req: Request, res: Response) => {
-    res.status(200).json({ 
+    res.status(200).json({
       success: true,
       message: "CORS is working correctly",
       origin: req.headers.origin,
@@ -49,50 +53,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("[Auth] Registration request received");
     try {
       const validatedData = insertUserSchema.parse(req.body);
-      
+
       // Check if username already exists
       const existingUsername = await storage.getUserByUsername(validatedData.username);
       if (existingUsername) {
         return res.status(400).json({ message: "Username already exists" });
       }
-      
+
       // Check if email already exists
       const existingEmail = await storage.getUserByEmail(validatedData.email);
       if (existingEmail) {
         return res.status(400).json({ message: "Email already registered" });
       }
-      
+
       // Check if mobile already exists
       const existingMobile = await storage.getUserByMobile(validatedData.mobile);
       if (existingMobile) {
         return res.status(400).json({ message: "Mobile number already registered" });
       }
-      
+
       // Hash password
       const hashedPassword = hashPassword(validatedData.password);
-      
+
       // Create user
       const user = await storage.createUser({
         ...validatedData,
         password: hashedPassword,
       });
-      
+
       // Don't send password back
       const { password, ...userWithoutPassword } = user;
-      
-      res.status(201).json({ 
+
+      res.status(201).json({
         message: "Registration successful",
-        user: userWithoutPassword 
+        user: userWithoutPassword
       });
     } catch (error) {
       console.error("[Auth] Registration error:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Validation error",
-          errors: error.errors 
+          errors: error.errors
         });
       }
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: "Internal server error",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -104,37 +108,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("[Auth] Login request received");
     try {
       const validatedData = loginSchema.parse(req.body);
-      
+
       // Find user by email or mobile
       const user = await storage.getUserByEmailOrMobile(validatedData.identifier);
-      
+
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
-      
+
       // Verify password
       const isValidPassword = verifyPassword(validatedData.password, user.password);
-      
+
       if (!isValidPassword) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
-      
+
       // Don't send password back
       const { password, ...userWithoutPassword } = user;
-      
-      res.status(200).json({ 
+
+      res.status(200).json({
         message: "Login successful",
-        user: userWithoutPassword 
+        user: userWithoutPassword
       });
     } catch (error) {
       console.error("[Auth] Login error:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Validation error",
-          errors: error.errors 
+          errors: error.errors
         });
       }
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: "Internal server error",
         error: error instanceof Error ? error.message : "Unknown error"
       });
@@ -152,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
     try {
       const { identifier, newPassword } = req.body;
-      
+
       if (!identifier || !newPassword) {
         return res.status(400).json({ message: "Email/mobile and new password are required" });
       }
@@ -163,17 +167,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Find user by email or mobile
       const user = await storage.getUserByEmailOrMobile(identifier);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
       // Hash new password
       const hashedPassword = hashPassword(newPassword);
-      
+
       // Update password
       const updated = await storage.updateUserPassword(user.id, hashedPassword);
-      
+
       if (!updated) {
         return res.status(500).json({ message: "Failed to update password" });
       }
@@ -189,7 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/change-password", async (req: Request, res: Response) => {
     try {
       const { userId, currentPassword, newPassword } = req.body;
-      
+
       if (!userId || !currentPassword || !newPassword) {
         return res.status(400).json({ message: "All fields are required" });
       }
@@ -200,24 +204,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get user
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
       // Verify current password
       const isValidPassword = verifyPassword(currentPassword, user.password);
-      
+
       if (!isValidPassword) {
         return res.status(401).json({ message: "Current password is incorrect" });
       }
 
       // Hash new password
       const hashedPassword = hashPassword(newPassword);
-      
+
       // Update password
       const updated = await storage.updateUserPassword(userId, hashedPassword);
-      
+
       if (!updated) {
         return res.status(500).json({ message: "Failed to update password" });
       }
@@ -230,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== FOOD ITEMS ROUTES =====
-  
+
   // Get all food items for a user
   app.get("/api/food-items/:userId", async (req: Request, res: Response) => {
     try {
@@ -247,21 +251,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/food-items", async (req: Request, res: Response) => {
     try {
       const { userId, ...itemData } = req.body;
-      
+
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
 
       const validatedData = insertFoodItemSchema.parse(itemData);
       const item = await storage.createFoodItem(userId, validatedData);
-      
+
       res.status(201).json({ message: "Food item created", item });
     } catch (error) {
       console.error("[FoodItems] Create item error:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Validation error",
-          errors: error.errors 
+          errors: error.errors
         });
       }
       res.status(500).json({ message: "Failed to create food item" });
@@ -273,17 +277,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { userId, ...updateData } = req.body;
-      
+
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
 
       const item = await storage.updateFoodItem(id, userId, updateData);
-      
+
       if (!item) {
         return res.status(404).json({ message: "Food item not found or unauthorized" });
       }
-      
+
       res.status(200).json({ message: "Food item updated", item });
     } catch (error) {
       console.error("[FoodItems] Update item error:", error);
@@ -296,17 +300,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { userId } = req.body;
-      
+
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
 
       const success = await storage.deleteFoodItem(id, userId);
-      
+
       if (!success) {
         return res.status(404).json({ message: "Food item not found or unauthorized" });
       }
-      
+
       res.status(200).json({ message: "Food item deleted" });
     } catch (error) {
       console.error("[FoodItems] Delete item error:", error);
@@ -321,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -329,10 +333,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({
         emailNotifications: user.emailNotifications === "true",
         whatsappNotifications: user.whatsappNotifications === "true",
+        telegramNotifications: user.telegramNotifications === "true",
+        telegramChatId: user.telegramChatId || null,
         notificationDays: parseInt(user.notificationDays || "3"),
+        browserNotifications: user.browserNotifications === "true",
+        quietHoursStart: user.quietHoursStart,
+        quietHoursEnd: user.quietHoursEnd,
         servicesConfigured: {
           email: emailService.isConfigured(),
           whatsapp: whatsappService.isConfigured(),
+          telegram: telegramService.isConfigured(),
+          push: pushService.isConfigured(),
         },
       });
     } catch (error) {
@@ -345,7 +356,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/notifications/preferences/:userId", async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
-      const { emailNotifications, whatsappNotifications, notificationDays } = req.body;
+      const {
+        emailNotifications,
+        whatsappNotifications,
+        telegramNotifications,
+        telegramChatId,
+        notificationDays,
+        browserNotifications,
+        quietHoursStart,
+        quietHoursEnd
+      } = req.body;
 
       const preferences: any = {};
       if (typeof emailNotifications === "boolean") {
@@ -354,6 +374,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof whatsappNotifications === "boolean") {
         preferences.whatsappNotifications = whatsappNotifications ? "true" : "false";
       }
+      if (typeof telegramNotifications === "boolean") {
+        preferences.telegramNotifications = telegramNotifications ? "true" : "false";
+      }
+      if (typeof browserNotifications === "boolean") {
+        preferences.browserNotifications = browserNotifications ? "true" : "false";
+      }
+      if (telegramChatId !== undefined) {
+        preferences.telegramChatId = telegramChatId;
+      }
+      if (quietHoursStart !== undefined) preferences.quietHoursStart = quietHoursStart;
+      if (quietHoursEnd !== undefined) preferences.quietHoursEnd = quietHoursEnd;
+
       if (typeof notificationDays === "number" && notificationDays > 0) {
         preferences.notificationDays = notificationDays.toString();
       }
@@ -364,9 +396,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      res.status(200).json({ 
+      res.status(200).json({
         message: "Notification preferences updated successfully",
-        preferences 
+        preferences
       });
     } catch (error) {
       console.error("[Notifications] Update preferences error:", error);
@@ -379,7 +411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const result = await notificationChecker.testNotification(userId);
-      
+
       if (result.success) {
         res.status(200).json(result);
       } else {
@@ -404,6 +436,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[Notifications] Check all error:", error);
       res.status(500).json({ message: "Failed to check notifications" });
     }
+  });
+
+  // Get VAPID Public Key
+  app.get("/api/notifications/vapid-public-key", (req: Request, res: Response) => {
+    const key = pushService.getPublicKey();
+    if (!key) {
+      return res.status(500).json({ message: "VAPID key not configured" });
+    }
+    res.json({ publicKey: key });
+  });
+
+  // Subscribe to push notifications
+  app.post("/api/notifications/subscribe", async (req: Request, res: Response) => {
+    try {
+      const { userId, subscription } = req.body;
+
+      if (!userId || !subscription) {
+        return res.status(400).json({ message: "User ID and subscription required" });
+      }
+
+      // Add subscription to user
+      const success = await storage.addPushSubscription(userId, JSON.stringify(subscription));
+
+      if (!success) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.status(200).json({ message: "Subscription added successfully" });
+    } catch (error) {
+      console.error("[Push] Subscription error:", error);
+      res.status(500).json({ message: "Failed to subscribe" });
+    }
+  });
+
+  // Get Telegram Bot configuration
+  app.get("/api/notifications/telegram-config", (req: Request, res: Response) => {
+    res.json({
+      botUsername: telegramService.getBotUsername()
+    });
   });
 
   const httpServer = createServer(app);

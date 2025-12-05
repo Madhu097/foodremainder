@@ -14,7 +14,8 @@ export interface IStorage {
   getUserByEmailOrMobile(identifier: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(userId: string, newPasswordHash: string): Promise<boolean>;
-  updateNotificationPreferences(userId: string, preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'notificationDays'>>): Promise<boolean>;
+  updateNotificationPreferences(userId: string, preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>): Promise<boolean>;
+  addPushSubscription(userId: string, subscription: string): Promise<boolean>;
 
   // Food item methods
   getFoodItemsByUserId(userId: string): Promise<FoodItem[]>;
@@ -74,7 +75,13 @@ export class MemStorage implements IStorage {
       id,
       emailNotifications: "true",
       whatsappNotifications: "false",
+      telegramNotifications: "false",
+      telegramChatId: null,
       notificationDays: "3",
+      pushSubscriptions: [],
+      browserNotifications: "false",
+      quietHoursStart: null,
+      quietHoursEnd: null,
       createdAt: new Date().toISOString(),
     };
     this.users.set(id, user);
@@ -93,13 +100,29 @@ export class MemStorage implements IStorage {
 
   async updateNotificationPreferences(
     userId: string,
-    preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'notificationDays'>>
+    preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
   ): Promise<boolean> {
     const user = this.users.get(userId);
     if (!user) {
       return false;
     }
     Object.assign(user, preferences);
+    this.users.set(userId, user);
+    return true;
+  }
+
+  async addPushSubscription(userId: string, subscription: string): Promise<boolean> {
+    const user = this.users.get(userId);
+    if (!user) return false;
+
+    // Initialize if undefined
+    if (!user.pushSubscriptions) user.pushSubscriptions = [];
+
+    // Avoid duplicates
+    if (!user.pushSubscriptions.includes(subscription)) {
+      user.pushSubscriptions.push(subscription);
+    }
+
     this.users.set(userId, user);
     return true;
   }
