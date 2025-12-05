@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { KeyRound } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChangePasswordModalProps {
   open: boolean;
