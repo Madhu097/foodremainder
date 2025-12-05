@@ -13,25 +13,32 @@ const app = express();
 
 // CORS middleware - must be before other middleware
 app.use((req, res, next) => {
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:5000',
-    'https://foodremainder.vercel.app',
-    'https://*.vercel.app'
-  ];
-  
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app'))) {
+  
+  // Allow all localhost origins for development
+  const isLocalhost = origin && (origin.includes('localhost') || origin.includes('127.0.0.1'));
+  
+  // Allow Vercel deployments
+  const isVercel = origin && origin.endsWith('.vercel.app');
+  
+  // Allow specific production domains
+  const allowedDomains = [
+    'https://foodremainder.vercel.app',
+  ];
+  const isAllowedDomain = origin && allowedDomains.includes(origin);
+  
+  if (isLocalhost || isVercel || isAllowedDomain) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
   
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
   
   // Handle preflight
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return res.status(204).end();
   }
   
   next();

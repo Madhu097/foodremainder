@@ -20,7 +20,28 @@ function verifyPassword(password: string, hash: string): boolean {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Test endpoint to verify API is working
   app.get("/api/health", (req: Request, res: Response) => {
-    res.status(200).json({ status: "ok", message: "API is working" });
+    res.status(200).json({ 
+      status: "ok", 
+      message: "API is working",
+      timestamp: new Date().toISOString(),
+      services: {
+        email: emailService.isConfigured(),
+        whatsapp: whatsappService.isConfigured(),
+      },
+      cors: {
+        origin: req.headers.origin || 'none',
+        host: req.headers.host,
+      }
+    });
+  });
+
+  // CORS test endpoint
+  app.get("/api/test-cors", (req: Request, res: Response) => {
+    res.status(200).json({ 
+      success: true,
+      message: "CORS is working correctly",
+      origin: req.headers.origin,
+    });
   });
 
   // Register new user
