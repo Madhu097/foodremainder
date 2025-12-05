@@ -7,6 +7,7 @@ import { User, Mail, Phone, Calendar, LogOut, ArrowLeft, KeyRound, Info, X } fro
 import { motion } from "framer-motion";
 import { ChangePasswordModal } from "@/components/ChangePasswordModal";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { safeLocalStorage } from "@/lib/storage";
 
 export default function ProfilePage() {
   const [, setLocation] = useLocation();
@@ -17,7 +18,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     // Check if user is logged in
-    const userStr = localStorage.getItem("user");
+    const userStr = safeLocalStorage.getItem("user");
     if (!userStr) {
       setLocation("/auth?mode=login");
       return;
@@ -27,14 +28,14 @@ export default function ProfilePage() {
       setCurrentUser(user);
       setIsAuthenticated(true);
     } catch (err) {
-      localStorage.removeItem("user");
+      safeLocalStorage.removeItem("user");
       setLocation("/auth?mode=login");
     }
   }, [setLocation]);
 
   // Check if free notification was dismissed
   useEffect(() => {
-    const dismissed = localStorage.getItem("freeNotificationDismissed");
+    const dismissed = safeLocalStorage.getItem("freeNotificationDismissed");
     if (dismissed === "true") {
       setShowFreeNotification(false);
     }
@@ -42,11 +43,11 @@ export default function ProfilePage() {
 
   const handleDismissFreeNotification = () => {
     setShowFreeNotification(false);
-    localStorage.setItem("freeNotificationDismissed", "true");
+    safeLocalStorage.setItem("freeNotificationDismissed", "true");
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    safeLocalStorage.removeItem("user");
     setIsAuthenticated(false);
     setCurrentUser(null);
     setLocation("/");

@@ -4,6 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { About } from "@/components/About";
 import { Footer } from "@/components/Footer";
+import { safeLocalStorage } from "@/lib/storage";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -11,7 +12,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // Check if user is logged in
-    const user = localStorage.getItem("user");
+    const user = safeLocalStorage.getItem("user");
     if (user) {
       setIsAuthenticated(true);
       // Redirect to dashboard if already logged in
@@ -20,7 +21,7 @@ export default function HomePage() {
   }, [setLocation]);
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    safeLocalStorage.removeItem("user");
     setIsAuthenticated(false);
   };
 

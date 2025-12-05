@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Package, AlertCircle, XCircle, CheckCircle, Plus, LayoutGrid, List, Loader2, Info, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { safeLocalStorage } from "@/lib/storage";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -51,7 +52,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadUserData = async () => {
       // Check if user is logged in
-      const userStr = localStorage.getItem("user");
+      const userStr = safeLocalStorage.getItem("user");
       if (!userStr) {
         setLocation("/auth?mode=login");
         return;
@@ -65,7 +66,7 @@ export default function DashboardPage() {
         // Fetch user's food items
         await fetchFoodItems(user.id);
       } catch (err) {
-        localStorage.removeItem("user");
+        safeLocalStorage.removeItem("user");
         setLocation("/auth?mode=login");
       }
     };
@@ -75,7 +76,7 @@ export default function DashboardPage() {
 
   // Check if free notification was dismissed
   useEffect(() => {
-    const dismissed = localStorage.getItem("freeNotificationDismissed");
+    const dismissed = safeLocalStorage.getItem("freeNotificationDismissed");
     if (dismissed === "true") {
       setShowFreeNotification(false);
     }
@@ -83,7 +84,7 @@ export default function DashboardPage() {
 
   const handleDismissFreeNotification = () => {
     setShowFreeNotification(false);
-    localStorage.setItem("freeNotificationDismissed", "true");
+    safeLocalStorage.setItem("freeNotificationDismissed", "true");
   };
 
   // Fetch food items for the current user
@@ -111,7 +112,7 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    safeLocalStorage.removeItem("user");
     setIsAuthenticated(false);
     setCurrentUser(null);
     setLocation("/");

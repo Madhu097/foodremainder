@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { AuthForm } from "@/components/AuthForm";
 import { useToast } from "@/hooks/use-toast";
+import { safeLocalStorage } from "@/lib/storage";
 
 interface RegisterFormData {
   username: string;
@@ -83,7 +84,7 @@ export default function AuthPage() {
       });
 
       // Store user data in localStorage (in production, use proper session management)
-      localStorage.setItem("user", JSON.stringify(result.user));
+      safeLocalStorage.setItem("user", JSON.stringify(result.user));
 
       // Redirect to dashboard
       setLocation("/dashboard");

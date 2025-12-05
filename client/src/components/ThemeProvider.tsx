@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { safeLocalStorage } from "@/lib/storage";
 
 type Theme = "light" | "dark";
 
@@ -21,15 +22,16 @@ export function ThemeProvider({
   children,
   defaultTheme = "light",
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem("theme") as Theme) || defaultTheme
-  );
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = safeLocalStorage.getItem("theme");
+    return (saved as Theme) || defaultTheme;
+  });
 
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(theme);
-    localStorage.setItem("theme", theme);
+    safeLocalStorage.setItem("theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {
