@@ -15,7 +15,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(userId: string, newPasswordHash: string): Promise<boolean>;
   updateNotificationPreferences(userId: string, preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'notificationDays'>>): Promise<boolean>;
-  
+
   // Food item methods
   getFoodItemsByUserId(userId: string): Promise<FoodItem[]>;
   getFoodItem(id: string): Promise<FoodItem | undefined>;
@@ -150,13 +150,23 @@ export class MemStorage implements IStorage {
 
 // Initialize storage based on environment
 function createStorage(): IStorage {
-  // For now, always use in-memory storage to ensure stability
-  // Database storage can be enabled after setting up DATABASE_URL
+  // Check if Firebase is configured
+  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+    try {
+      const { FirebaseStorage } = require('./firebaseStorage');
+      console.log("[Storage] ✅ Using Firebase Firestore");
+      console.log("[Storage] 💾 Data will persist in Firebase");
+      return new FirebaseStorage();
+    } catch (error) {
+      console.error("[Storage] ❌ Failed to initialize Firebase Storage:", error);
+      console.log("[Storage] ⚠️  Falling back to in-memory storage");
+    }
+  }
+
+  // Fall back to in-memory storage
   console.log("[Storage] Using in-memory storage");
   console.log("[Storage] 💾 Data will persist during this session only");
-  if (!process.env.DATABASE_URL) {
-    console.log("[Storage] 💡 Tip: Set DATABASE_URL to enable persistent storage (see DATABASE_SETUP.md)");
-  }
+  console.log("[Storage] 💡 Tip: Configure Firebase credentials in .env to enable persistent storage");
   return new MemStorage();
 }
 

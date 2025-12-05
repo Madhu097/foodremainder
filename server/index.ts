@@ -1,3 +1,6 @@
+// MUST be first - load environment variables before anything else
+import "./loadEnv";
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -45,13 +48,13 @@ app.use((req, res, next) => {
   log("Initializing notification services...");
   const emailInitialized = emailService.initialize();
   const whatsappInitialized = whatsappService.initialize();
-  
+
   if (emailInitialized) {
     log("✓ Email notifications enabled");
   } else {
     log("⚠ Email notifications disabled (configure EMAIL_* environment variables)");
   }
-  
+
   if (whatsappInitialized) {
     log("✓ WhatsApp notifications enabled");
   } else {
@@ -66,7 +69,7 @@ app.use((req, res, next) => {
   // doesn't interfere with the other routes
   // Auto-detect development mode (NODE_ENV or check if dist folder exists)
   const isDevelopment = process.env.NODE_ENV !== "production" && !fs.existsSync(path.resolve(import.meta.dirname, "..", "dist", "public"));
-  
+
   if (isDevelopment) {
     log("Running in DEVELOPMENT mode with Vite");
     await setupVite(app, server);
@@ -89,7 +92,7 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-server.listen(port, "0.0.0.0", () => {
-  log(`serving on port ${port}`);
-});
+  server.listen(port, "0.0.0.0", () => {
+    log(`serving on port ${port}`);
+  });
 })();
