@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Bell, Mail, MessageCircle, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { API_BASE_URL } from "@/lib/api";
 
 interface NotificationPreferences {
   emailNotifications: boolean;
@@ -40,7 +41,9 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const fetchPreferences = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/notifications/preferences/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/notifications/preferences/${userId}`, {
+        credentials: "include",
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch preferences");
       }
@@ -61,7 +64,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/notifications/preferences/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/preferences/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -69,6 +72,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
           whatsappNotifications: preferences.whatsappNotifications,
           notificationDays: preferences.notificationDays,
         }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -94,8 +98,9 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const handleTestNotification = async () => {
     setIsTesting(true);
     try {
-      const response = await fetch(`/api/notifications/test/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/test/${userId}`, {
         method: "POST",
+        credentials: "include",
       });
 
       const result = await response.json();

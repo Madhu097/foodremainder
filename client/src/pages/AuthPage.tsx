@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { AuthForm } from "@/components/AuthForm";
 import { useToast } from "@/hooks/use-toast";
 import { safeLocalStorage } from "@/lib/storage";
+import { API_BASE_URL } from "@/lib/api";
 
 interface RegisterFormData {
   username: string;
@@ -41,15 +42,17 @@ export default function AuthPage() {
 
     try {
       const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
-      console.log("[Auth] Sending request to:", endpoint);
+      const fullUrl = `${API_BASE_URL}${endpoint}`;
+      console.log("[Auth] Sending request to:", fullUrl);
       console.log("[Auth] Request data:", { ...data, password: "***" });
       
-      const response = await fetch(endpoint, {
+      const response = await fetch(fullUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
+        credentials: "include",
       });
 
       console.log("[Auth] Response status:", response.status);

@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
+import { KeyRound } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -53,7 +54,7 @@ export function ChangePasswordModal({ open, onOpenChange, userId }: ChangePasswo
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/change-password", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -63,6 +64,7 @@ export function ChangePasswordModal({ open, onOpenChange, userId }: ChangePasswo
           currentPassword,
           newPassword,
         }),
+        credentials: "include",
       });
 
       const result = await response.json();

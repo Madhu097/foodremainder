@@ -9,6 +9,7 @@ import { Package, AlertCircle, XCircle, CheckCircle, Plus, LayoutGrid, List, Loa
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { safeLocalStorage } from "@/lib/storage";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -93,7 +94,9 @@ export default function DashboardPage() {
     setError("");
     
     try {
-      const response = await fetch(`/api/food-items/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/food-items/${userId}`, {
+        credentials: "include",
+      });
       
       if (!response.ok) {
         throw new Error("Failed to fetch food items");
@@ -129,13 +132,14 @@ export default function DashboardPage() {
     try {
       if (editingItem) {
         // Update existing item
-        const response = await fetch(`/api/food-items/${editingItem.id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/food-items/${editingItem.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: currentUser.id,
             ...data,
           }),
+          credentials: "include",
         });
 
         if (!response.ok) {
@@ -157,13 +161,14 @@ export default function DashboardPage() {
         setEditingItem(null);
       } else {
         // Add new item
-        const response = await fetch("/api/food-items", {
+        const response = await fetch(`${API_BASE_URL}/api/food-items`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: currentUser.id,
             ...data,
           }),
+          credentials: "include",
         });
 
         if (!response.ok) {
@@ -201,10 +206,11 @@ export default function DashboardPage() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch(`/api/food-items/${item.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/food-items/${item.id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: currentUser.id }),
+        credentials: "include",
       });
 
       if (!response.ok) {
