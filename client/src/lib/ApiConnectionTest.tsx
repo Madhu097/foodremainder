@@ -21,6 +21,7 @@ export function ApiConnectionTest() {
       try {
         const url = `${API_BASE_URL}/api/health`;
         console.log('[API Test] Testing connection to:', url);
+        console.log('[API Test] Current window.location:', window.location.href);
         
         const response = await fetch(url, {
           method: 'GET',
@@ -28,17 +29,28 @@ export function ApiConnectionTest() {
         });
         
         console.log('[API Test] Response status:', response.status);
+        console.log('[API Test] Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        const responseText = await response.text();
+        console.log('[API Test] Response text (first 200 chars):', responseText.substring(0, 200));
         
         if (response.ok) {
-          const data = await response.json();
-          console.log('[API Test] Response data:', data);
+          let data;
+          try {
+            data = JSON.parse(responseText);
+            console.log('[API Test] Parsed response data:', data);
+          } catch (e) {
+            console.error('[API Test] Failed to parse JSON:', e);
+            throw new Error('Server returned invalid JSON: ' + responseText.substring(0, 100));
+          }
+          
           setStatus({
             baseUrl: API_BASE_URL,
             connected: true,
             response: data,
           });
         } else {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          throw new Error(`HTTP ${response.status}: ${responseText.substring(0, 100)}`);
         }
       } catch (error) {
         console.error('[API Test] Connection failed:', error);

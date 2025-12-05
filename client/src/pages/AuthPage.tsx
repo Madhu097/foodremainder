@@ -44,6 +44,7 @@ export default function AuthPage() {
       const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
       const fullUrl = `${API_BASE_URL}${endpoint}`;
       console.log("[Auth] Sending request to:", fullUrl);
+      console.log("[Auth] API_BASE_URL:", API_BASE_URL);
       console.log("[Auth] Request data:", { ...data, password: "***" });
       
       const response = await fetch(fullUrl, {
@@ -57,14 +58,20 @@ export default function AuthPage() {
 
       console.log("[Auth] Response status:", response.status);
       console.log("[Auth] Response ok:", response.ok);
+      console.log("[Auth] Response headers:", Object.fromEntries(response.headers.entries()));
+
+      // Get response as text first to see what we're getting
+      const responseText = await response.text();
+      console.log("[Auth] Response text:", responseText);
 
       let result;
       try {
-        result = await response.json();
-        console.log("[Auth] Response data:", result);
+        result = JSON.parse(responseText);
+        console.log("[Auth] Parsed response data:", result);
       } catch (parseError) {
         console.error("[Auth] Failed to parse JSON response:", parseError);
-        setError("Invalid response from server. Please try again.");
+        console.error("[Auth] Response was:", responseText.substring(0, 500));
+        setError(`Server error: ${responseText.substring(0, 100) || 'Invalid response format'}`);
         return;
       }
 
@@ -95,7 +102,13 @@ export default function AuthPage() {
       console.error("[Auth] Caught error:", err);
       console.error("[Auth] Error type:", err instanceof Error ? err.constructor.name : typeof err);
       console.error("[Auth] Error message:", err instanceof Error ? err.message : String(err));
-      setError("Network error. Please try again.");
+      
+      // More detailed error message
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError(`Cannot connect to server at ${API_BASE_URL}. Please check if the backend is running.`);
+      } else {
+        setError(`Network error: ${err instanceof Error ? err.message : 'Please try again'}`);
+      }
     } finally {
       setIsLoading(false);
     }
