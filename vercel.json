@@ -1,5 +1,8 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "outputDirectory": "dist/public"
+  "outputDirectory": "dist/public",
+  "env": {
+    "VITE_API_URL": "https://foodremainder.onrender.com"
+  }
 }
