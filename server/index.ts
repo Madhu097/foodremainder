@@ -10,6 +10,33 @@ import fs from "fs";
 import path from "path";
 
 const app = express();
+
+// CORS middleware - must be before other middleware
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5000',
+    'https://foodremainder.vercel.app',
+    'https://*.vercel.app'
+  ];
+  
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -45,7 +72,6 @@ app.use((req, res, next) => {
 
 // Initialize services immediately (only once)
 let servicesInitialized = false;
-let appInitialized = false;
 
 function initializeServices() {
   if (servicesInitialized) return;
@@ -68,10 +94,8 @@ function initializeServices() {
   }
 }
 
-async function setupApp() {
-  if (appInitialized) return null;
-  appInitialized = true;
-  
+// Main application startup
+(async () => {
   initializeServices();
 
   // Register API routes FIRST
@@ -100,21 +124,12 @@ async function setupApp() {
     throw err;
   });
 
-  return server;
-}
-
-// Only start server if not in Vercel
-if (!process.env.VERCEL) {
-  setupApp().then((server) => {
-    const port = parseInt(process.env.PORT || '5000', 10);
-    server.listen(port, "0.0.0.0", () => {
-      log(`serving on port ${port}`);
-    });
+  // Start the server
+  const port = parseInt(process.env.PORT || '5000', 10);
+  server.listen(port, "0.0.0.0", () => {
+    log(`serving on port ${port}`);
   });
-} else {
-  // For Vercel, initialize app immediately
-  setupApp();
-}
+})();
 
-// Export for Vercel serverless
+// Export for serverless environments
 export default app;
