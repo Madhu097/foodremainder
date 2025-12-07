@@ -6,12 +6,14 @@ export interface User {
   username: string;
   email: string;
   mobile: string;
+  profilePicture: string; // Avatar selection: 'iron-man', 'captain-america', 'black-widow', 'hulk', 'thor', 'black-panther', or 'default'
   password: string;
   emailNotifications: string;
   whatsappNotifications: string;
   telegramNotifications: string;
   telegramChatId: string | null;
   notificationDays: string;
+  notificationsPerDay: string; // Number of times to send notifications per day (1-4)
   pushSubscriptions: string[]; // Array of JSON stringified PushSubscription objects
   browserNotifications: string;
   quietHoursStart: string | null;

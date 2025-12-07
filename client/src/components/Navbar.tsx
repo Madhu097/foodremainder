@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Leaf, Menu, X, User } from "lucide-react";
+import { Leaf, Menu, X, User, HelpCircle } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -51,6 +51,10 @@ export function Navbar({
                 </Link>
               </>
             )}
+            <Link href="/help-contact" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md flex items-center gap-2" data-testid="link-help">
+              <HelpCircle className="w-4 h-4" />
+              Help
+            </Link>
           </div>
 
           <div className="hidden md:flex items-center gap-3">
@@ -114,6 +118,10 @@ export function Navbar({
                   </Link>
                 </>
               )}
+              <Link href="/help-contact" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2 flex items-center gap-2" data-testid="link-help-mobile">
+                <HelpCircle className="w-4 h-4" />
+                Help & Contact
+              </Link>
               <div className="pt-2 space-y-2">
                 {!isAuthenticated ? (
                   <>

@@ -10,6 +10,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import AuthPage from "@/pages/AuthPage";
 import ProfilePage from "@/pages/ProfilePage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import HelpContactPage from "@/pages/HelpContactPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/help-contact" component={HelpContactPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -97,7 +97,9 @@ export class FirebaseStorage implements IStorage {
             telegramNotifications: "false",
             telegramChatId: null,
             notificationDays: "3",
+            notificationsPerDay: "1",
             pushSubscriptions: [],
+            profilePicture: "default",
             browserNotifications: "false",
             quietHoursStart: null,
             quietHoursEnd: null,
@@ -120,9 +122,24 @@ export class FirebaseStorage implements IStorage {
         }
     }
 
+    async updateUserProfile(userId: string, profile: { username?: string; email?: string; profilePicture?: string }): Promise<boolean> {
+        if (!db) throw new Error("Firestore not initialized");
+        try {
+            const updateData: any = {};
+            if (profile.username !== undefined) updateData.username = profile.username;
+            if (profile.email !== undefined) updateData.email = profile.email;
+            if (profile.profilePicture !== undefined) updateData.profilePicture = profile.profilePicture;
+
+            await db.collection('users').doc(userId).update(updateData);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
     async updateNotificationPreferences(
         userId: string,
-        preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
+        preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
     ): Promise<boolean> {
         if (!db) throw new Error("Firestore not initialized");
         try {

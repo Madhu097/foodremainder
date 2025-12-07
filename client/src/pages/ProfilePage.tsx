@@ -3,21 +3,49 @@ import { useLocation } from "wouter";
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { User, Mail, Phone, Calendar, LogOut, ArrowLeft, KeyRound, Info, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { User, Mail, Phone, Calendar, LogOut, ArrowLeft, KeyRound, Edit2, Check, X, Camera } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ChangePasswordModal } from "@/components/ChangePasswordModal";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { safeLocalStorage } from "@/lib/storage";
+import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+// Avatar options with Avengers theme
+const AVATARS = [
+  { id: "default", name: "Default", color: "from-gray-400 to-gray-600" },
+  { id: "iron-man", name: "Iron Man", color: "from-red-500 to-yellow-600" },
+  { id: "captain-america", name: "Captain America", color: "from-blue-500 to-red-500" },
+  { id: "black-widow", name: "Black Widow", color: "from-black to-red-600" },
+  { id: "hulk", name: "Hulk", color: "from-green-500 to-green-700" },
+  { id: "thor", name: "Thor", color: "from-blue-400 to-gray-500" },
+  { id: "black-panther", name: "Black Panther", color: "from-purple-600 to-black" },
+];
 
 export default function ProfilePage() {
   const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const [showFreeNotification, setShowFreeNotification] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const [editData, setEditData] = useState({
+    username: "",
+    email: "",
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is logged in
     const userStr = safeLocalStorage.getItem("user");
     if (!userStr) {
       setLocation("/auth?mode=login");
@@ -26,25 +54,16 @@ export default function ProfilePage() {
     try {
       const user = JSON.parse(userStr);
       setCurrentUser(user);
+      setEditData({
+        username: user.username,
+        email: user.email,
+      });
       setIsAuthenticated(true);
     } catch (err) {
       safeLocalStorage.removeItem("user");
       setLocation("/auth?mode=login");
     }
   }, [setLocation]);
-
-  // Check if free notification was dismissed
-  useEffect(() => {
-    const dismissed = safeLocalStorage.getItem("freeNotificationDismissed");
-    if (dismissed === "true") {
-      setShowFreeNotification(false);
-    }
-  }, []);
-
-  const handleDismissFreeNotification = () => {
-    setShowFreeNotification(false);
-    safeLocalStorage.setItem("freeNotificationDismissed", "true");
-  };
 
   const handleLogout = () => {
     safeLocalStorage.removeItem("user");
@@ -53,9 +72,100 @@ export default function ProfilePage() {
     setLocation("/");
   };
 
-  if (!isAuthenticated || !currentUser) {
-    return null;
-  }
+  const handleEditToggle = () => {
+    if (editMode) {
+      // Cancel editing
+      setEditData({
+        username: currentUser.username,
+        email: currentUser.email,
+      });
+    }
+    setEditMode(!editMode);
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/update-profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          username: editData.username,
+          email: editData.email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to update profile");
+      }
+
+      // Update local storage and state
+      safeLocalStorage.setItem("user", JSON.stringify(data.user));
+      setCurrentUser(data.user);
+      setEditMode(false);
+
+      toast({
+        title: "Success!",
+        description: "Profile updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAvatarSelect = async (avatarId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/update-profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          profilePicture: avatarId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to update avatar");
+      }
+
+      // Update local storage and state
+      safeLocalStorage.setItem("user", JSON.stringify(data.user));
+      setCurrentUser(data.user);
+      setAvatarDialogOpen(false);
+
+      toast({
+        title: "Success!",
+        description: "Avatar updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update avatar",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getAvatarGradient = () => {
+    const avatar = AVATARS.find((a) => a.id === currentUser?.profilePicture) || AVATARS[0];
+    return avatar.color;
+  };
+
+  const getAvatarUrl = () => {
+    const avatarId = currentUser?.profilePicture || "default";
+    return `/avatars/${avatarId}.svg`;
+  };
 
   const formatDate = (dateString: string) => {
     try {
@@ -69,182 +179,270 @@ export default function ProfilePage() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Navbar
-        isAuthenticated={isAuthenticated}
-        onLogoutClick={handleLogout}
-      />
+  if (!isAuthenticated || !currentUser) {
+    return null;
+  }
 
-      <main className="flex-1">
-        {showFreeNotification && (
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 dark:from-blue-950/30 dark:via-indigo-950/30 dark:to-blue-950/30 border-b border-blue-200 dark:border-blue-800">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-              <div className="flex items-start gap-3">
-                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    🎉 You're using Food Reminder Free Edition
-                  </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                    Enjoying the service? Consider upgrading for premium features like unlimited items, advanced analytics, and priority support.
-                  </p>
-                </div>
-                <button
-                  onClick={handleDismissFreeNotification}
-                  className="flex-shrink-0 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
-                  aria-label="Dismiss notification"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  return (
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <Navbar isAuthenticated={isAuthenticated} onLogoutClick={handleLogout} />
+
+      <main className="flex-1 py-6 sm:py-8 lg:py-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back Button */}
-          <Button
-            variant="ghost"
-            onClick={() => setLocation("/dashboard")}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
             className="mb-6"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-
-          {/* Profile Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <Card className="mb-6">
-              <CardHeader className="text-center">
-                <div className="flex justify-center mb-4">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
-                    <User className="w-12 h-12 text-white" />
-                  </div>
-                </div>
-                <CardTitle className="text-3xl">{currentUser.username}</CardTitle>
-                <CardDescription>Welcome to your profile</CardDescription>
-              </CardHeader>
-            </Card>
+            <Button
+              variant="ghost"
+              onClick={() => setLocation("/dashboard")}
+              className="group hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+              Back to Dashboard
+            </Button>
           </motion.div>
 
-          {/* Profile Information */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>Your account details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Username */}
-                <div className="flex items-start space-x-4 p-4 rounded-lg bg-muted/50">
-                  <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
-                    <User className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">Username</p>
-                    <p className="text-lg font-semibold">{currentUser.username}</p>
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div className="flex items-start space-x-4 p-4 rounded-lg bg-muted/50">
-                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
-                    <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">Email Address</p>
-                    <p className="text-lg font-semibold">{currentUser.email}</p>
-                  </div>
-                </div>
-
-                {/* Mobile */}
-                <div className="flex items-start space-x-4 p-4 rounded-lg bg-muted/50">
-                  <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
-                    <Phone className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">Mobile Number</p>
-                    <p className="text-lg font-semibold">{currentUser.mobile}</p>
-                  </div>
-                </div>
-
-                {/* Member Since */}
-                {currentUser.createdAt && (
-                  <div className="flex items-start space-x-4 p-4 rounded-lg bg-muted/50">
-                    <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/20">
-                      <Calendar className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+            {/* Left Column - Profile Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="lg:col-span-1"
+            >
+              <Card className="overflow-hidden border-0 shadow-xl">
+                <div className={`h-32 bg-gradient-to-br ${getAvatarGradient()}`} />
+                <CardContent className="pt-0 pb-6">
+                  <div className="flex flex-col items-center -mt-16">
+                    {/* Avatar */}
+                    <div className="relative group">
+                      <div className="w-32 h-32 rounded-full border-4 border-white dark:border-slate-900 shadow-xl overflow-hidden bg-white">
+                        <img
+                          src={getAvatarUrl()}
+                          alt="Profile Avatar"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        onClick={() => setAvatarDialogOpen(true)}
+                        className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
+                      >
+                        <Camera className="w-5 h-5" />
+                      </button>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-muted-foreground">Member Since</p>
-                      <p className="text-lg font-semibold">{formatDate(currentUser.createdAt)}</p>
+
+                    {/* Name */}
+                    <h2 className="mt-4 text-2xl font-bold text-foreground">
+                      {currentUser.username}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">{currentUser.email}</p>
+
+                    {/* Member Since */}
+                    {currentUser.createdAt && (
+                      <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="w-4 h-4" />
+                        <span>Member since {formatDate(currentUser.createdAt)}</span>
+                      </div>
+                    )}
+
+                    {/* Quick Actions */}
+                    <div className="w-full mt-6 space-y-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setChangePasswordOpen(true)}
+                        className="w-full justify-start"
+                      >
+                        <KeyRound className="w-4 h-4 mr-2" />
+                        Change Password
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleLogout}
+                        className="w-full justify-start"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Sign Out
+                      </Button>
                     </div>
                   </div>
-                )}
+                </CardContent>
+              </Card>
+            </motion.div>
 
-                {/* User ID */}
-                <div className="flex items-start space-x-4 p-4 rounded-lg bg-muted/50">
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">User ID</p>
-                    <p className="text-xs font-mono text-muted-foreground break-all">{currentUser.id}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+            {/* Right Column - Details & Settings */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Personal Information */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+              >
+                <Card className="border-0 shadow-lg">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl">Personal Information</CardTitle>
+                      <CardDescription>Manage your account details</CardDescription>
+                    </div>
+                    {!editMode ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleEditToggle}
+                        className="gap-2"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleEditToggle}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveProfile}
+                          disabled={isSaving}
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Username */}
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-sm font-medium">
+                        Username
+                      </Label>
+                      {editMode ? (
+                        <Input
+                          id="username"
+                          value={editData.username}
+                          onChange={(e) =>
+                            setEditData({ ...editData, username: e.target.value })
+                          }
+                          className="font-medium"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                          <User className="w-5 h-5 text-primary" />
+                          <span className="font-medium">{currentUser.username}</span>
+                        </div>
+                      )}
+                    </div>
 
-          {/* Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-            className="mt-6"
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setChangePasswordOpen(true)}
-                  className="w-full"
-                >
-                  <KeyRound className="w-4 h-4 mr-2" />
-                  Change Password
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleLogout}
-                  className="w-full"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
+                    {/* Email */}
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium">
+                        Email Address
+                      </Label>
+                      {editMode ? (
+                        <Input
+                          id="email"
+                          type="email"
+                          value={editData.email}
+                          onChange={(e) =>
+                            setEditData({ ...editData, email: e.target.value })
+                          }
+                          className="font-medium"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                          <Mail className="w-5 h-5 text-blue-500" />
+                          <span className="font-medium">{currentUser.email}</span>
+                        </div>
+                      )}
+                    </div>
 
-          {/* Notification Settings */}
-          <NotificationSettings userId={currentUser.id} />
+                    {/* Mobile (Read-only) */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Mobile Number</Label>
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                        <Phone className="w-5 h-5 text-green-500" />
+                        <span className="font-medium">{currentUser.mobile}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Contact support to change your mobile number
+                      </p>
+                    </div>
+
+                    {/* User ID */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">User ID</Label>
+                      <div className="p-3 rounded-lg bg-muted/50">
+                        <code className="text-xs text-muted-foreground break-all">
+                          {currentUser.id}
+                        </code>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Notification Settings */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+              >
+                <NotificationSettings userId={currentUser.id} />
+              </motion.div>
+            </div>
+          </div>
         </div>
       </main>
 
+      {/* Avatar Selection Dialog */}
+      <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose Your Avatar</DialogTitle>
+            <DialogDescription>
+              Select an Avengers-themed avatar for your profile
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 py-4">
+            {AVATARS.map((avatar) => (
+              <button
+                key={avatar.id}
+                onClick={() => handleAvatarSelect(avatar.id)}
+                className={`group relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105 ${currentUser.profilePicture === avatar.id
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50"
+                  }`}
+              >
+                <div className="w-16 h-16 rounded-full overflow-hidden shadow-lg bg-white">
+                  <img
+                    src={`/avatars/${avatar.id}.svg`}
+                    alt={avatar.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className="text-sm font-medium text-center">{avatar.name}</span>
+                {currentUser.profilePicture === avatar.id && (
+                  <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                    <Check className="w-3 h-3 text-primary-foreground" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Change Password Modal */}
-      {currentUser && (
-        <ChangePasswordModal
-          open={changePasswordOpen}
-          onOpenChange={setChangePasswordOpen}
-          userId={currentUser.id}
-        />
-      )}
-    </div>
+      {
+        currentUser && (
+          <ChangePasswordModal
+            open={changePasswordOpen}
+            onOpenChange={setChangePasswordOpen}
+            userId={currentUser.id}
+          />
+        )
+      }
+    </div >
   );
 }

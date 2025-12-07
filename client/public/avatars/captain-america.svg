@@ -1,0 +1,13 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="capGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ef4444;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <circle cx="100" cy="100" r="100" fill="url(#capGrad)"/>
+  <circle cx="100" cy="75" r="30" fill="white" opacity="0.9"/>
+  <ellipse cx="100" cy="145" rx="45" ry="55" fill="white" opacity="0.9"/>
+  <circle cx="100" cy="100" r="20" fill="white" opacity="0.8"/>
+  <path d="M 100 80 L 110 100 L 100 95 L 90 100 Z" fill="#ef4444"/>
+</svg>

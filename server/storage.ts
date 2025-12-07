@@ -14,7 +14,8 @@ export interface IStorage {
   getUserByEmailOrMobile(identifier: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(userId: string, newPasswordHash: string): Promise<boolean>;
-  updateNotificationPreferences(userId: string, preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>): Promise<boolean>;
+  updateUserProfile(userId: string, profile: { username?: string; email?: string; profilePicture?: string }): Promise<boolean>;
+  updateNotificationPreferences(userId: string, preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>): Promise<boolean>;
   addPushSubscription(userId: string, subscription: string): Promise<boolean>;
 
   // Food item methods
@@ -78,7 +79,9 @@ export class MemStorage implements IStorage {
       telegramNotifications: "false",
       telegramChatId: null,
       notificationDays: "3",
+      notificationsPerDay: "1",
       pushSubscriptions: [],
+      profilePicture: "default",
       browserNotifications: "false",
       quietHoursStart: null,
       quietHoursEnd: null,
@@ -98,9 +101,24 @@ export class MemStorage implements IStorage {
     return true;
   }
 
+  async updateUserProfile(userId: string, profile: { username?: string; email?: string; profilePicture?: string }): Promise<boolean> {
+    const user = this.users.get(userId);
+    if (!user) {
+      return false;
+    }
+
+    // Update only provided fields
+    if (profile.username !== undefined) user.username = profile.username;
+    if (profile.email !== undefined) user.email = profile.email;
+    if (profile.profilePicture !== undefined) user.profilePicture = profile.profilePicture;
+
+    this.users.set(userId, user);
+    return true;
+  }
+
   async updateNotificationPreferences(
     userId: string,
-    preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
+    preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
   ): Promise<boolean> {
     const user = this.users.get(userId);
     if (!user) {
@@ -172,14 +190,19 @@ export class MemStorage implements IStorage {
 }
 
 // Initialize storage based on environment
-function createStorage(): IStorage {
+let storageInstance: IStorage | null = null;
+
+async function initializeStorage(): Promise<IStorage> {
+  if (storageInstance) return storageInstance;
+
   // Check if Firebase is configured
   if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
     try {
-      const { FirebaseStorage } = require('./firebaseStorage');
+      const { FirebaseStorage } = await import('./firebaseStorage.js');
       console.log("[Storage] ✅ Using Firebase Firestore");
       console.log("[Storage] 💾 Data will persist in Firebase");
-      return new FirebaseStorage();
+      storageInstance = new FirebaseStorage();
+      return storageInstance;
     } catch (error) {
       console.error("[Storage] ❌ Failed to initialize Firebase Storage:", error);
       console.log("[Storage] ⚠️  Falling back to in-memory storage");
@@ -190,7 +213,19 @@ function createStorage(): IStorage {
   console.log("[Storage] Using in-memory storage");
   console.log("[Storage] 💾 Data will persist during this session only");
   console.log("[Storage] 💡 Tip: Configure Firebase credentials in .env to enable persistent storage");
-  return new MemStorage();
+  storageInstance = new MemStorage();
+  return storageInstance;
 }
 
-export const storage: IStorage = createStorage();
+// Initialize immediately
+const storagePromise = initializeStorage();
+
+// Export a proxy that waits for initialization
+export const storage: IStorage = new Proxy({} as IStorage, {
+  get: (target, prop) => {
+    return async (...args: any[]) => {
+      const instance = await storagePromise;
+      return (instance as any)[prop](...args);
+    };
+  }
+});

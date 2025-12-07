@@ -16,6 +16,7 @@ interface NotificationPreferences {
   browserNotifications: boolean;
   telegramChatId?: string;
   notificationDays: number;
+  notificationsPerDay: number; // 1-4 times per day
   quietHoursStart?: string | null;
   quietHoursEnd?: string | null;
   servicesConfigured?: {
@@ -38,6 +39,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
     browserNotifications: false,
     telegramChatId: "",
     notificationDays: 3,
+    notificationsPerDay: 1,
     quietHoursStart: "",
     quietHoursEnd: "",
   });
@@ -169,6 +171,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
           browserNotifications: preferences.browserNotifications,
           telegramChatId: preferences.telegramChatId,
           notificationDays: preferences.notificationDays,
+          notificationsPerDay: preferences.notificationsPerDay,
           quietHoursStart: preferences.quietHoursStart || null,
           quietHoursEnd: preferences.quietHoursEnd || null,
         }),
@@ -511,6 +514,36 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
               />
               <span className="text-sm text-muted-foreground">days before expiry</span>
             </div>
+          </div>
+
+          {/* Notifications Per Day */}
+          <div className="p-4 rounded-lg bg-muted/50 space-y-3">
+            <Label htmlFor="notifications-per-day" className="text-base font-semibold">
+              Notification Frequency
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              How many times per day should we send you notifications?
+            </p>
+            <div className="flex items-center gap-3">
+              <Input
+                id="notifications-per-day"
+                type="number"
+                min="1"
+                max="4"
+                value={preferences.notificationsPerDay}
+                onChange={(e) =>
+                  setPreferences({
+                    ...preferences,
+                    notificationsPerDay: Math.min(4, Math.max(1, parseInt(e.target.value) || 1)),
+                  })
+                }
+                className="w-24"
+              />
+              <span className="text-sm text-muted-foreground">times per day</span>
+            </div>
+            <p className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+              💡 <strong>1:</strong> 9 AM • <strong>2:</strong> 9 AM, 6 PM • <strong>3:</strong> 9 AM, 2 PM, 7 PM • <strong>4:</strong> 8 AM, 12 PM, 4 PM, 8 PM
+            </p>
           </div>
 
           {/* Action Buttons */}

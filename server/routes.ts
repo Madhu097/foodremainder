@@ -233,6 +233,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user profile (username, email, profilePicture)
+  app.put("/api/auth/update-profile", async (req: Request, res: Response) => {
+    try {
+      const { userId, username, email, profilePicture } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      // Check if trying to update to existing username/email
+      if (username) {
+        const existingUsername = await storage.getUserByUsername(username);
+        if (existingUsername && existingUsername.id !== userId) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+      }
+
+      if (email) {
+        const existingEmail = await storage.getUserByEmail(email);
+        if (existingEmail && existingEmail.id !== userId) {
+          return res.status(400).json({ message: "Email already registered" });
+        }
+      }
+
+      const updated = await storage.updateUserProfile(userId, {
+        username,
+        email,
+        profilePicture
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Return updated user info
+      const user = await storage.getUser(userId);
+      if (user) {
+        const { password, ...userWithoutPassword } = user;
+        res.status(200).json({
+          message: "Profile updated successfully",
+          user: userWithoutPassword
+        });
+      } else {
+        res.status(500).json({ message: "Failed to fetch updated user" });
+      }
+    } catch (error) {
+      console.error("[Auth] Update profile error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // ===== FOOD ITEMS ROUTES =====
 
   // Get all food items for a user
@@ -336,6 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         telegramNotifications: user.telegramNotifications === "true",
         telegramChatId: user.telegramChatId || null,
         notificationDays: parseInt(user.notificationDays || "3"),
+        notificationsPerDay: parseInt(user.notificationsPerDay || "1"),
         browserNotifications: user.browserNotifications === "true",
         quietHoursStart: user.quietHoursStart,
         quietHoursEnd: user.quietHoursEnd,
@@ -362,6 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         telegramNotifications,
         telegramChatId,
         notificationDays,
+        notificationsPerDay,
         browserNotifications,
         quietHoursStart,
         quietHoursEnd
@@ -388,6 +441,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (typeof notificationDays === "number" && notificationDays > 0) {
         preferences.notificationDays = notificationDays.toString();
+      }
+      if (typeof notificationsPerDay === "number" && notificationsPerDay >= 1 && notificationsPerDay <= 4) {
+        preferences.notificationsPerDay = notificationsPerDay.toString();
       }
 
       const updated = await storage.updateNotificationPreferences(userId, preferences);
