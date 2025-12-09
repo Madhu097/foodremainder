@@ -15,12 +15,13 @@ export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  
+
   // All hooks must be at the top - before any conditional returns
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [filterStatus, setFilterStatus] = useState<"all" | "fresh" | "expiring" | "expired">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [showFreeNotification, setShowFreeNotification] = useState(true);
@@ -32,9 +33,9 @@ export default function DashboardPage() {
     today.setHours(0, 0, 0, 0);
     const expiryDate = new Date(item.expiryDate);
     expiryDate.setHours(0, 0, 0, 0);
-    
+
     const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     let status: "fresh" | "expiring" | "expired" = "fresh";
     if (daysLeft < 0) {
       status = "expired";
@@ -58,7 +59,7 @@ export default function DashboardPage() {
         setLocation("/auth?mode=login");
         return;
       }
-      
+
       try {
         const user = JSON.parse(userStr);
         setCurrentUser(user);
@@ -92,12 +93,12 @@ export default function DashboardPage() {
   const fetchFoodItems = async (userId: string) => {
     setIsLoading(true);
     setError("");
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/food-items/${userId}`, {
         credentials: "include",
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to fetch food items");
       }
@@ -148,16 +149,16 @@ export default function DashboardPage() {
 
         const result = await response.json();
         const updatedItem = calculateItemStatus(result.item);
-        
-        setFoodItems(foodItems.map((item) => 
+
+        setFoodItems(foodItems.map((item) =>
           item.id === editingItem.id ? updatedItem : item
         ));
-        
+
         toast({
           title: "Updated!",
           description: "Food item updated successfully.",
         });
-        
+
         setEditingItem(null);
       } else {
         // Add new item
@@ -177,15 +178,15 @@ export default function DashboardPage() {
 
         const result = await response.json();
         const newItem = calculateItemStatus(result.item);
-        
+
         setFoodItems([...foodItems, newItem]);
-        
+
         toast({
           title: "Added!",
           description: "Food item added to your inventory.",
         });
       }
-      
+
       setModalOpen(false);
     } catch (err) {
       console.error("Error saving food item:", err);
@@ -218,7 +219,7 @@ export default function DashboardPage() {
       }
 
       setFoodItems(foodItems.filter((i) => i.id !== item.id));
-      
+
       toast({
         title: "Deleted!",
         description: "Food item removed from your inventory.",
@@ -284,24 +285,73 @@ export default function DashboardPage() {
             </Button>
           </div>
 
-          {stats.expiring > 0 && (
-            <Alert className="border-l-4 border-l-expiring bg-expiring/5">
-              <AlertCircle className="h-5 w-5 text-expiring" />
-              <AlertDescription className="text-sm font-medium">
-                <span className="font-bold">{stats.expiring}</span> item{stats.expiring > 1 ? "s" : ""} expiring within the next 3 days. Review now to avoid waste!
-              </AlertDescription>
-            </Alert>
+         {stats.expiring > 0 && (
+         <Alert 
+          className="border-l-4 border-l-expiring bg-expiring/5 cursor-pointer hover:bg-expiring/10 transition-all duration-200"
+          onClick={() => setFilterStatus("expiring")}
+           >
+           <AlertCircle className="h-5 w-5 text-expiring" />
+      <AlertDescription className="text-sm font-medium">
+      {(() => {
+        const expiringItems = foodItems.filter(i => i.status === "expiring");
+        if (expiringItems.length === 0) return null;
+        
+        const minDays = Math.min(...expiringItems.map(i => i.daysLeft));
+        const maxDays = Math.max(...expiringItems.map(i => i.daysLeft));
+        
+        if (minDays === maxDays) {
+          return (
+            <>
+              <span className="font-bold">{stats.expiring}</span> item{stats.expiring > 1 ? "s" : ""} expiring in{" "}
+              <span className="font-bold text-expiring">{minDays}</span> day{minDays !== 1 ? "s" : ""}. 
+              <span className="ml-1 underline">Click to view →</span>
+            </>
+          );
+        } else {
+          return (
+            <>
+              <span className="font-bold">{stats.expiring}</span> item{stats.expiring > 1 ? "s" : ""} expiring within{" "}
+              <span className="font-bold text-expiring">{minDays}-{maxDays}</span> days. 
+              <span className="ml-1 underline">Click to view →</span>
+            </>
+          );
+          }
+          })()}
+          </AlertDescription>
+          </Alert>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatsCard title="Total Items" value={stats.total} icon={Package} variant="default" />
-            <StatsCard title="Fresh" value={stats.fresh} icon={CheckCircle} variant="fresh" />
-            <StatsCard title="Expiring Soon" value={stats.expiring} icon={AlertCircle} variant="expiring" />
-            <StatsCard title="Expired" value={stats.expired} icon={XCircle} variant="expired" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div onClick={() => setFilterStatus("all")} className="cursor-pointer hover:scale-105 transition-transform">
+              <StatsCard title="Total Items" value={stats.total} icon={Package} variant="default" />
+            </div>
+            <div onClick={() => setFilterStatus("fresh")} className="cursor-pointer hover:scale-105 transition-transform">
+              <StatsCard title="Fresh" value={stats.fresh} icon={CheckCircle} variant="fresh" />
+            </div>
+            <div onClick={() => setFilterStatus("expiring")} className="cursor-pointer hover:scale-105 transition-transform">
+              <StatsCard title="Expiring Soon" value={stats.expiring} icon={AlertCircle} variant="expiring" />
+            </div>
+            <div onClick={() => setFilterStatus("expired")} className="cursor-pointer hover:scale-105 transition-transform">
+              <StatsCard title="Expired" value={stats.expired} icon={XCircle} variant="expired" />
+            </div>
           </div>
 
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Your Food Items</h2>
+            <div>
+              <h2 className="text-xl font-semibold">Your Food Items</h2>
+              {filterStatus !== "all" && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing <span className="font-bold capitalize text-primary">{filterStatus}</span> items
+                  {" • "}
+                  <button
+                    onClick={() => setFilterStatus("all")}
+                    className="text-primary hover:underline"
+                  >
+                    Clear filter
+                  </button>
+                </p>
+              )}
+            </div>
             <div className="flex gap-2">
               <Button
                 variant={viewMode === "grid" ? "default" : "outline"}
@@ -345,18 +395,20 @@ export default function DashboardPage() {
               </Button>
             </div>
           ) : (
-            <div className={viewMode === "grid" 
-              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
+            <div className={viewMode === "grid"
+              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               : "space-y-4"
             }>
-              {foodItems.map((item) => (
-                <FoodItemCard
-                  key={item.id}
-                  item={item}
-                  onEdit={handleEditFood}
-                  onDelete={handleDeleteFood}
-                />
-              ))}
+              {foodItems
+                .filter(item => filterStatus === "all" || item.status === filterStatus)
+                .map((item) => (
+                  <FoodItemCard
+                    key={item.id}
+                    item={item}
+                    onEdit={handleEditFood}
+                    onDelete={handleDeleteFood}
+                  />
+                ))}
             </div>
           )}
         </div>

@@ -500,16 +500,21 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             <div className="flex items-center gap-3">
               <Input
                 id="notification-days"
-                type="number"
-                min="1"
-                max="30"
-                value={preferences.notificationDays}
-                onChange={(e) =>
-                  setPreferences({
-                    ...preferences,
-                    notificationDays: parseInt(e.target.value) || 3,
-                  })
-                }
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={preferences.notificationDays === 0 ? '' : preferences.notificationDays.toString()}  // ✅ CHANGED
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  if (val === '') {
+                    setPreferences({ ...preferences, notificationDays: 0 });  // ✅ CHANGED TO 0
+                  } else {
+                    const num = parseInt(val);
+                    if (!isNaN(num) && num <= 99) {  // ✅ REMOVED >= 1 CHECK
+                      setPreferences({ ...preferences, notificationDays: num });
+                    }
+                  }
+                }}
                 className="w-24"
               />
               <span className="text-sm text-muted-foreground">days before expiry</span>
@@ -525,18 +530,23 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
               How many times per day should we send you notifications?
             </p>
             <div className="flex items-center gap-3">
-              <Input
-                id="notifications-per-day"
-                type="number"
-                min="1"
-                max="4"
-                value={preferences.notificationsPerDay}
-                onChange={(e) =>
-                  setPreferences({
-                    ...preferences,
-                    notificationsPerDay: Math.min(4, Math.max(1, parseInt(e.target.value) || 1)),
-                  })
+             <Input
+              id="notifications-per-day"  
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={preferences.notificationsPerDay === 0 ? '' : preferences.notificationsPerDay.toString()}  // ✅ CHANGED
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                if (val === '') {
+                  setPreferences({ ...preferences, notificationsPerDay: 0 });  // ✅ CHANGED TO 0
+                } else {
+                  const num = parseInt(val);
+                  if (!isNaN(num) && num <= 9) {  // ✅ REMOVED >= 1 CHECK
+                    setPreferences({ ...preferences, notificationsPerDay: num });
+                  }
                 }
+              }}
                 className="w-24"
               />
               <span className="text-sm text-muted-foreground">times per day</span>
