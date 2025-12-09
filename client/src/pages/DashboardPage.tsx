@@ -321,7 +321,7 @@ export default function DashboardPage() {
           </Alert>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div onClick={() => setFilterStatus("all")} className="cursor-pointer hover:scale-105 transition-transform">
               <StatsCard title="Total Items" value={stats.total} icon={Package} variant="default" />
             </div>
