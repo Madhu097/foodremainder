@@ -26,7 +26,31 @@ class TelegramService {
 
         try {
             // Enable polling to receive /start messages
-            this.bot = new TelegramBot(botToken, { polling: true });
+            this.bot = new TelegramBot(botToken, { polling: false });
+
+            // Handle polling errors to prevent crash
+            this.bot.on('polling_error', (error) => {
+                if (error.message.includes('409 Conflict')) {
+                    console.error("[TelegramService] ⚠️ Conflict detected! Another instance is running. Polling stopped.");
+                    this.bot?.stopPolling();
+                } else {
+                    console.error(`[TelegramService] Polling error: ${error.message}`);
+                }
+            });
+
+            // Start polling safely
+            this.bot.startPolling();
+
+            // Handle polling errors to prevent crash
+            this.bot.on('polling_error', (error) => {
+                // Determine if it's a fatal error or just a temporary network/conflict issue
+                if (error.message.includes('409 Conflict')) {
+                    console.error("[TelegramService] ⚠️ Conflict detected! Another instance is running. Polling stopped.");
+                    this.bot?.stopPolling();
+                } else {
+                    console.error(`[TelegramService] Polling error: ${error.message}`);
+                }
+            });
 
             // Handle /start <userId>
             this.bot.onText(/\/start (.+)/, async (msg, match) => {

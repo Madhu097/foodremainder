@@ -18,15 +18,19 @@ class EmailService {
   private config: EmailConfig | null = null;
 
   initialize() {
+    console.log("[EmailService] Initializing email service...");
     const emailService = process.env.EMAIL_SERVICE || "smtp";
     const from = process.env.EMAIL_FROM || "Food Reminder <noreply@foodreminder.app>";
+
+    console.log(`[EmailService] Mode: ${emailService}`);
+    console.log(`[EmailService] From: ${from}`);
 
     // Option 1: Resend (Modern, recommended, free tier: 100 emails/day)
     if (emailService === "resend") {
       const resendApiKey = process.env.RESEND_API_KEY;
 
       if (!resendApiKey) {
-        console.warn("[EmailService] Resend API key not found. Email notifications will be disabled.");
+        console.error("[EmailService] ❌ Resend API key not found. Email notifications will be disabled.");
         console.warn("[EmailService] Set RESEND_API_KEY in your .env file.");
         return false;
       }
@@ -37,10 +41,14 @@ class EmailService {
         from,
       };
 
-      this.resendClient = new Resend(resendApiKey);
-      console.log("[EmailService] ✅ Email service initialized with Resend");
-      console.log("[EmailService] 📧 Free tier: 100 emails/day, 3,000/month");
-      return true;
+      try {
+        this.resendClient = new Resend(resendApiKey);
+        console.log("[EmailService] ✅ Email service initialized with Resend");
+        return true;
+      } catch (e) {
+        console.error("[EmailService] ❌ Failed to initialize Resend client:", e);
+        return false;
+      }
     }
 
     // Option 2: Traditional SMTP (Gmail, SendGrid, etc.)
@@ -49,8 +57,10 @@ class EmailService {
     const user = process.env.EMAIL_USER;
     const password = process.env.EMAIL_PASSWORD;
 
+    console.log(`[EmailService] Check SMTP Config: Host=${!!host}, Port=${!!port}, User=${!!user}, Pass=${!!password}`);
+
     if (!host || !port || !user || !password) {
-      console.warn("[EmailService] SMTP configuration not found. Email notifications will be disabled.");
+      console.warn("[EmailService] ❌ SMTP configuration incomplete. Email notifications will be disabled.");
       console.warn("[EmailService] Set EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD in your .env file.");
       console.warn("[EmailService] Or switch to Resend by setting EMAIL_SERVICE=resend and RESEND_API_KEY");
       return false;
@@ -65,24 +75,34 @@ class EmailService {
       from,
     };
 
-    // Create transporter
-    this.transporter = nodemailer.createTransport({
-      host: this.config.host,
-      port: this.config.port,
-      secure: this.config.port === 465, // true for 465, false for other ports
-      auth: {
-        user: this.config.user,
-        pass: this.config.password,
-      },
-    });
+    try {
+      // Create transporter
+      this.transporter = nodemailer.createTransport({
+        host: this.config.host,
+        port: this.config.port,
+        secure: this.config.port === 465, // true for 465, false for other ports
+        auth: {
+          user: this.config.user,
+          pass: this.config.password,
+        },
+      });
 
-    console.log("[EmailService] ✅ Email service initialized with SMTP");
-    console.log(`[EmailService] 📧 Using ${host}:${port}`);
-    return true;
+      console.log("[EmailService] ✅ Email service initialized with SMTP");
+      console.log(`[EmailService] 📧 Using ${host}:${port}`);
+      return true;
+    } catch (e) {
+      console.error("[EmailService] ❌ Failed to create SMTP transporter:", e);
+      return false;
+    }
   }
 
   isConfigured(): boolean {
-    return (this.transporter !== null || this.resendClient !== null) && this.config !== null;
+    const configured = (this.transporter !== null || this.resendClient !== null) && this.config !== null;
+    if (!configured) {
+      // Only log this once ideally, but good for debugging now
+      // console.debug("[EmailService] Check configured: false");
+    }
+    return configured;
   }
 
   async sendExpiryNotification(user: User, expiringItems: FoodItem[]): Promise<boolean> {
@@ -91,11 +111,14 @@ class EmailService {
       return false;
     }
 
+    console.log(`[EmailService] Attempting to send email to ${user.email} with ${expiringItems.length} items`);
+
     try {
       const { subject, htmlContent, textContent } = this.generateEmailContent(user, expiringItems);
 
       if (this.config!.service === "resend" && this.resendClient) {
         // Send via Resend
+        console.log("[EmailService] Sending via Resend...");
         const { data, error } = await this.resendClient.emails.send({
           from: this.config!.from,
           to: user.email,
@@ -105,13 +128,14 @@ class EmailService {
         });
 
         if (error) {
-          console.error("[EmailService] ❌ Resend API Error:", error);
+          console.error("[EmailService] ❌ Resend API Error Response:", JSON.stringify(error, null, 2));
           throw new Error(`Resend Error: ${error.message}`);
         }
 
         console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via Resend. ID: ${data?.id}`);
       } else if (this.transporter) {
         // Send via SMTP
+        console.log("[EmailService] Sending via SMTP...");
         const info = await this.transporter.sendMail({
           from: this.config!.from,
           to: user.email,
@@ -125,6 +149,9 @@ class EmailService {
       return true;
     } catch (error) {
       console.error("[EmailService] ❌ Failed to send email:", error);
+      if (error instanceof Error) {
+        console.error("[EmailService] Error details:", error.message, error.stack);
+      }
       return false;
     }
   }

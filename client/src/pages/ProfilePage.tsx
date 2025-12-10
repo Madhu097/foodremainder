@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +45,7 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [copiedUserId, setCopiedUserId] = useState(false);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -581,22 +582,11 @@ export default function ProfilePage() {
                   <p className="text-xs text-muted-foreground">Supports PNG, JPG (max 5MB)</p>
                 </div>
 
-                <label className="cursor-pointer relative mt-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleCustomImageUpload}
-                    className="hidden"
-                    disabled={uploadingImage}
-                  />
+                <div className="relative mt-2 inline-block z-10">
                   <Button
                     type="button"
                     disabled={uploadingImage}
-                    className="font-medium px-6 pointer-events-none" // pointer-events-none because the label handles the click
-                    onClick={() => {
-                      // This click handler is just for visual feedback, actual file input is triggered by label
-                      (document.querySelector('input[type="file"]') as HTMLInputElement)?.click();
-                    }}
+                    className="font-medium px-6 pointer-events-none"
                   >
                     {uploadingImage ? (
                       <>
@@ -607,7 +597,17 @@ export default function ProfilePage() {
                       "Choose from Device"
                     )}
                   </Button>
-                </label>
+
+                  {/* Invisible Overlay Input - Higher Z-Index for Mobile */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCustomImageUpload}
+                    disabled={uploadingImage}
+                    title="Upload profile picture"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
+                  />
+                </div>
               </div>
             </div>
 
@@ -621,7 +621,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4">
                 {AVATARS.map((avatar) => (
                   <button
                     key={avatar.id}
