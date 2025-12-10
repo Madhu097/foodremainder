@@ -4,7 +4,6 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { ApiConnectionTest } from "@/lib/ApiConnectionTest";
 import HomePage from "@/pages/HomePage";
 import DashboardPage from "@/pages/DashboardPage";
 import AuthPage from "@/pages/AuthPage";
@@ -34,7 +33,6 @@ function App() {
         <TooltipProvider>
           <Router />
           <Toaster />
-          <ApiConnectionTest />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
