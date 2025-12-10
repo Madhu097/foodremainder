@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createHash } from "crypto";
 import { emailService } from "./emailService";
 import { whatsappService } from "./whatsappService";
+import { smsService } from "./smsService";
 import { telegramService } from "./telegramService";
 import { pushService } from "./pushService";
 import { notificationChecker } from "./notificationChecker";
@@ -384,6 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({
         emailNotifications: user.emailNotifications === "true",
         whatsappNotifications: user.whatsappNotifications === "true",
+        smsNotifications: user.smsNotifications === "true",
         telegramNotifications: user.telegramNotifications === "true",
         telegramChatId: user.telegramChatId || null,
         notificationDays: parseInt(user.notificationDays || "3"),
@@ -394,6 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         servicesConfigured: {
           email: emailService.isConfigured(),
           whatsapp: whatsappService.isConfigured(),
+          sms: smsService.isConfigured(),
           telegram: telegramService.isConfigured(),
           push: pushService.isConfigured(),
         },
@@ -411,6 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         emailNotifications,
         whatsappNotifications,
+        smsNotifications,
         telegramNotifications,
         telegramChatId,
         notificationDays,
@@ -426,6 +430,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (typeof whatsappNotifications === "boolean") {
         preferences.whatsappNotifications = whatsappNotifications ? "true" : "false";
+      }
+      if (typeof smsNotifications === "boolean") {
+        preferences.smsNotifications = smsNotifications ? "true" : "false";
       }
       if (typeof telegramNotifications === "boolean") {
         preferences.telegramNotifications = telegramNotifications ? "true" : "false";

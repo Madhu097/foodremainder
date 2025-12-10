@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Bell, Mail, MessageCircle, Loader2, CheckCircle2, AlertCircle, Send, Globe, Moon } from "lucide-react";
+import { Bell, Mail, MessageCircle, Loader2, CheckCircle2, AlertCircle, Send, Globe, Moon, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { API_BASE_URL } from "@/lib/api";
@@ -12,6 +12,7 @@ import { API_BASE_URL } from "@/lib/api";
 interface NotificationPreferences {
   emailNotifications: boolean;
   whatsappNotifications: boolean;
+  smsNotifications: boolean;
   telegramNotifications: boolean;
   browserNotifications: boolean;
   telegramChatId?: string;
@@ -22,6 +23,7 @@ interface NotificationPreferences {
   servicesConfigured?: {
     email: boolean;
     whatsapp: boolean;
+    sms: boolean;
     telegram: boolean;
     push: boolean;
   };
@@ -35,6 +37,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     emailNotifications: true,
     whatsappNotifications: false,
+    smsNotifications: false,
     telegramNotifications: false,
     browserNotifications: false,
     telegramChatId: "",
@@ -167,6 +170,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
         body: JSON.stringify({
           emailNotifications: preferences.emailNotifications,
           whatsappNotifications: preferences.whatsappNotifications,
+          smsNotifications: preferences.smsNotifications,
           telegramNotifications: preferences.telegramNotifications,
           browserNotifications: preferences.browserNotifications,
           telegramChatId: preferences.telegramChatId,
@@ -371,6 +375,43 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             />
           </div>
 
+          {/* SMS Notifications */}
+          <div className="flex items-start justify-between space-x-4 p-4 rounded-lg bg-muted/50">
+            <div className="flex items-start space-x-3 flex-1">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/20 mt-1">
+                <Smartphone className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="sms-notifications" className="text-base font-semibold cursor-pointer">
+                    SMS Notifications
+                  </Label>
+                  {preferences.servicesConfigured?.sms ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Receive expiry alerts via SMS
+                  {!preferences.servicesConfigured?.sms && (
+                    <span className="block text-amber-600 dark:text-amber-500 mt-1">
+                      ⚠️ SMS service not configured on server
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="sms-notifications"
+              checked={preferences.smsNotifications}
+              onCheckedChange={(checked) =>
+                setPreferences({ ...preferences, smsNotifications: checked })
+              }
+              disabled={!preferences.servicesConfigured?.sms}
+            />
+          </div>
+
           {/* Telegram Notifications */}
           <div className="flex flex-col space-y-4 p-4 rounded-lg bg-muted/50">
             <div className="flex items-start justify-between space-x-4">
@@ -530,23 +571,23 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
               How many times per day should we send you notifications?
             </p>
             <div className="flex items-center gap-3">
-             <Input
-              id="notifications-per-day"  
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={preferences.notificationsPerDay === 0 ? '' : preferences.notificationsPerDay.toString()}  // ✅ CHANGED
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                if (val === '') {
-                  setPreferences({ ...preferences, notificationsPerDay: 0 });  // ✅ CHANGED TO 0
-                } else {
-                  const num = parseInt(val);
-                  if (!isNaN(num) && num <= 9) {  // ✅ REMOVED >= 1 CHECK
-                    setPreferences({ ...preferences, notificationsPerDay: num });
+              <Input
+                id="notifications-per-day"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={preferences.notificationsPerDay === 0 ? '' : preferences.notificationsPerDay.toString()}  // ✅ CHANGED
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  if (val === '') {
+                    setPreferences({ ...preferences, notificationsPerDay: 0 });  // ✅ CHANGED TO 0
+                  } else {
+                    const num = parseInt(val);
+                    if (!isNaN(num) && num <= 9) {  // ✅ REMOVED >= 1 CHECK
+                      setPreferences({ ...preferences, notificationsPerDay: num });
+                    }
                   }
-                }
-              }}
+                }}
                 className="w-24"
               />
               <span className="text-sm text-muted-foreground">times per day</span>

@@ -96,24 +96,30 @@ class EmailService {
 
       if (this.config!.service === "resend" && this.resendClient) {
         // Send via Resend
-        await this.resendClient.emails.send({
+        const { data, error } = await this.resendClient.emails.send({
           from: this.config!.from,
           to: user.email,
           subject,
           html: htmlContent,
           text: textContent,
         });
-        console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via Resend`);
+
+        if (error) {
+          console.error("[EmailService] ❌ Resend API Error:", error);
+          throw new Error(`Resend Error: ${error.message}`);
+        }
+
+        console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via Resend. ID: ${data?.id}`);
       } else if (this.transporter) {
         // Send via SMTP
-        await this.transporter.sendMail({
+        const info = await this.transporter.sendMail({
           from: this.config!.from,
           to: user.email,
           subject,
           text: textContent,
           html: htmlContent,
         });
-        console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via SMTP`);
+        console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via SMTP. ID: ${info.messageId}`);
       }
 
       return true;

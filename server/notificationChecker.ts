@@ -87,10 +87,11 @@ class NotificationChecker {
     // Check if user has any notifications enabled
     const emailEnabled = user.emailNotifications === "true";
     const whatsappEnabled = user.whatsappNotifications === "true";
+    const smsEnabled = user.smsNotifications === "true";
     const telegramEnabled = user.telegramNotifications === "true";
     const pushEnabled = user.browserNotifications === "true";
 
-    if (!emailEnabled && !whatsappEnabled && !telegramEnabled && !pushEnabled) {
+    if (!emailEnabled && !whatsappEnabled && !smsEnabled && !telegramEnabled && !pushEnabled) {
       return null;
     }
 
@@ -136,7 +137,7 @@ class NotificationChecker {
     }
 
     // Send SMS notification
-    if (whatsappEnabled && !result.whatsappSent && smsService.isConfigured()) {
+    if (smsEnabled && smsService.isConfigured()) {
       result.smsSent = await smsService.sendExpiryNotification(user, expiringItems);
     }
 

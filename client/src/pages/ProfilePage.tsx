@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Mail, Phone, Calendar, LogOut, ArrowLeft, KeyRound, Edit2, Check, X, Camera } from "lucide-react";
+import { User, Mail, Phone, Calendar, LogOut, ArrowLeft, KeyRound, Edit2, Check, X, Camera, Upload, Copy, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChangePasswordModal } from "@/components/ChangePasswordModal";
 import { NotificationSettings } from "@/components/NotificationSettings";
@@ -43,6 +43,8 @@ export default function ProfilePage() {
     email: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [copiedUserId, setCopiedUserId] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -157,14 +159,123 @@ export default function ProfilePage() {
     }
   };
 
+  const handleCustomImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "Please upload an image file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "Image size should be less than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      // Convert image to base64
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+
+        const response = await fetch(`${API_BASE_URL}/api/auth/update-profile`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            profilePicture: base64String,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to upload image");
+        }
+
+        // Update local storage and state
+        safeLocalStorage.setItem("user", JSON.stringify(data.user));
+        setCurrentUser(data.user);
+        setAvatarDialogOpen(false);
+
+        toast({
+          title: "Success!",
+          description: "Profile picture updated successfully",
+        });
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload image",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const getAvatarGradient = () => {
-    const avatar = AVATARS.find((a) => a.id === currentUser?.profilePicture) || AVATARS[0];
-    return avatar.color;
+    const profilePic = currentUser?.profilePicture;
+    // If it's a custom uploaded image (base64) or not in lists
+    if (profilePic && profilePic.startsWith('data:image')) {
+      return "from-violet-500 to-fuchsia-600";
+    }
+    const avatar = AVATARS.find((a) => a.id === profilePic);
+    return avatar ? avatar.color : "from-slate-400 to-slate-600";
   };
 
   const getAvatarUrl = () => {
-    const avatarId = currentUser?.profilePicture || "default";
-    return `/avatars/${avatarId}.svg`;
+    const profilePic = currentUser?.profilePicture;
+
+    // Safety check
+    if (!profilePic) {
+      return "/avatars/default.svg";
+    }
+
+    // Check if it's a base64 image (custom upload)
+    if (profilePic.startsWith('data:image')) {
+      return profilePic;
+    }
+
+    // Check if it's a valid preset ID
+    const isPreset = AVATARS.some(a => a.id === profilePic);
+    if (isPreset) {
+      return `/avatars/${profilePic}.svg`;
+    }
+
+    // Default fallback
+    return "/avatars/default.svg";
+  };
+
+  const getUserDisplayId = () => {
+    if (!currentUser) return "";
+    // Create a formatted user ID like "username#1234"
+    const hashPart = currentUser.id.slice(0, 8).toUpperCase();
+    return `${currentUser.username}#${hashPart}`;
+  };
+
+  const copyUserId = () => {
+    if (!currentUser) return;
+    navigator.clipboard.writeText(getUserDisplayId());
+    setCopiedUserId(true);
+    toast({
+      title: "Copied!",
+      description: "User ID copied to clipboard",
+    });
+    setTimeout(() => setCopiedUserId(false), 2000);
   };
 
   const formatDate = (dateString: string) => {
@@ -226,13 +337,20 @@ export default function ProfilePage() {
                       <div className="relative w-32 h-32 rounded-full border-4 border-white dark:border-slate-900 shadow-2xl overflow-hidden bg-white">
                         <img
                           src={getAvatarUrl()}
-                          alt="Profile Avatar"
+                          alt="Profile"
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            // Prevent infinite loop by checking if we're already trying to load the default
+                            if (!target.src.includes('default.svg')) {
+                              target.src = '/avatars/default.svg';
+                            }
+                          }}
                         />
                       </div>
                       <button
                         onClick={() => setAvatarDialogOpen(true)}
-                        className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 hover:shadow-xl"
+                        className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-110 hover:shadow-xl"
                       >
                         <Camera className="w-5 h-5" />
                       </button>
@@ -243,6 +361,26 @@ export default function ProfilePage() {
                       {currentUser.username}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">{currentUser.email}</p>
+
+                    {/* User ID Badge */}
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-100 dark:border-purple-900">
+                        <span className="text-xs font-mono font-semibold text-purple-700 dark:text-purple-300">
+                          {getUserDisplayId()}
+                        </span>
+                      </div>
+                      <button
+                        onClick={copyUserId}
+                        className="p-1.5 rounded-full hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors group"
+                        title="Copy User ID"
+                      >
+                        {copiedUserId ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform" />
+                        )}
+                      </button>
+                    </div>
 
                     {/* Member Since */}
                     {currentUser.createdAt && (
@@ -382,11 +520,27 @@ export default function ProfilePage() {
                     {/* User ID */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">User ID</Label>
-                      <div className="p-3 rounded-lg bg-muted/50">
-                        <code className="text-xs text-muted-foreground break-all">
-                          {currentUser.id}
-                        </code>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 border border-purple-100 dark:border-purple-900">
+                          <code className="text-sm font-mono font-semibold text-purple-700 dark:text-purple-300">
+                            {getUserDisplayId()}
+                          </code>
+                        </div>
+                        <button
+                          onClick={copyUserId}
+                          className="p-3 rounded-lg border border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-all group"
+                          title="Copy User ID"
+                        >
+                          {copiedUserId ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <Copy className="w-5 h-5 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform" />
+                          )}
+                        </button>
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        Your unique identifier for support and sharing
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -407,38 +561,101 @@ export default function ProfilePage() {
 
       {/* Avatar Selection Dialog */}
       <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Choose Your Avatar</DialogTitle>
-            <DialogDescription>
-              Select an Avengers-themed avatar for your profile
+            <DialogTitle className="text-xl font-bold text-center">Customize Profile Picture</DialogTitle>
+            <DialogDescription className="text-center">
+              Upload your own photo or choose from our gallery
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 py-4">
-            {AVATARS.map((avatar) => (
-              <button
-                key={avatar.id}
-                onClick={() => handleAvatarSelect(avatar.id)}
-                className={`group relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105 ${currentUser.profilePicture === avatar.id
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/50"
-                  }`}
-              >
-                <div className="w-16 h-16 rounded-full overflow-hidden shadow-lg bg-white">
-                  <img
-                    src={`/avatars/${avatar.id}.svg`}
-                    alt={avatar.name}
-                    className="w-full h-full object-cover"
-                  />
+
+          <div className="grid gap-6 py-4">
+            {/* Custom Upload Section */}
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-6 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/50 transition-colors">
+              <div className="flex flex-col items-center gap-3">
+                <div className="bg-primary/10 p-4 rounded-full">
+                  <Upload className="w-8 h-8 text-primary" />
                 </div>
-                <span className="text-sm font-medium text-center">{avatar.name}</span>
-                {currentUser.profilePicture === avatar.id && (
-                  <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="w-3 h-3 text-primary-foreground" />
-                  </div>
-                )}
-              </button>
-            ))}
+                <div className="text-center space-y-1">
+                  <h3 className="font-semibold text-foreground">Upload Custom Photo</h3>
+                  <p className="text-xs text-muted-foreground">Supports PNG, JPG (max 5MB)</p>
+                </div>
+
+                <label className="cursor-pointer relative mt-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCustomImageUpload}
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
+                  <Button
+                    type="button"
+                    disabled={uploadingImage}
+                    className="font-medium px-6 pointer-events-none" // pointer-events-none because the label handles the click
+                    onClick={() => {
+                      // This click handler is just for visual feedback, actual file input is triggered by label
+                      (document.querySelector('input[type="file"]') as HTMLInputElement)?.click();
+                    }}
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <div className="w-4 h-4 mr-2 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      "Choose from Device"
+                    )}
+                  </Button>
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground font-medium">Or Select Avatar</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4">
+                {AVATARS.map((avatar) => (
+                  <button
+                    key={avatar.id}
+                    onClick={() => handleAvatarSelect(avatar.id)}
+                    className={`group relative flex flex-col items-center gap-2 p-2 rounded-xl transition-all duration-200 ${currentUser.profilePicture === avatar.id
+                      ? "ring-2 ring-primary bg-primary/5 scale-105"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-800 hover:scale-105"
+                      }`}
+                  >
+                    <div className="relative w-14 h-14 rounded-full overflow-hidden shadow-sm bg-white ring-1 ring-slate-100 dark:ring-slate-800">
+                      <img
+                        src={`/avatars/${avatar.id}.svg`}
+                        alt={avatar.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (!target.src.includes('default.svg')) {
+                            target.src = '/avatars/default.svg';
+                          }
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-medium text-center truncate w-full px-1">
+                      {avatar.name}
+                    </span>
+                    {currentUser.profilePicture === avatar.id && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-sm z-10">
+                        <Check className="w-3 h-3 text-primary-foreground" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

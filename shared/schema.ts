@@ -16,6 +16,7 @@ export interface User {
   notificationsPerDay: string; // Number of times to send notifications per day (1-4)
   pushSubscriptions: string[]; // Array of JSON stringified PushSubscription objects
   browserNotifications: string;
+  smsNotifications: string;
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
   createdAt: string;
