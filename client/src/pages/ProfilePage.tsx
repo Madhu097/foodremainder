@@ -582,32 +582,31 @@ export default function ProfilePage() {
                   <p className="text-xs text-muted-foreground">Supports PNG, JPG (max 5MB)</p>
                 </div>
 
-                <div className="relative mt-2 inline-block z-10">
-                  <Button
-                    type="button"
-                    disabled={uploadingImage}
-                    className="font-medium px-6 pointer-events-none"
-                  >
-                    {uploadingImage ? (
-                      <>
-                        <div className="w-4 h-4 mr-2 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      "Choose from Device"
-                    )}
-                  </Button>
 
-                  {/* Invisible Overlay Input - Higher Z-Index for Mobile */}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleCustomImageUpload}
-                    disabled={uploadingImage}
-                    title="Upload profile picture"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
-                  />
-                </div>
+                {/* Mobile-Friendly File Input */}
+                <label
+                  htmlFor="profile-upload-input"
+                  className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 py-2 mt-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ pointerEvents: uploadingImage ? 'none' : 'auto' }}
+                >
+                  {uploadingImage ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                      <span>Uploading...</span>
+                    </>
+                  ) : (
+                    <span>Choose from Device</span>
+                  )}
+                </label>
+                <input
+                  id="profile-upload-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCustomImageUpload}
+                  disabled={uploadingImage}
+                  className="hidden"
+                  aria-label="Upload profile picture"
+                />
               </div>
             </div>
 
