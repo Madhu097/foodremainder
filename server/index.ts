@@ -2,6 +2,7 @@
 import "./loadEnv";
 
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { emailService } from "./emailService";
@@ -14,6 +15,25 @@ import fs from "fs";
 import path from "path";
 
 const app = express();
+
+// Enable compression for all responses (must be early in middleware chain)
+app.use(compression({
+  // Compress all responses over 1kb
+  threshold: 1024,
+  // Compression level (0-9, 6 is default, good balance of speed/compression)
+  level: 6,
+  // Filter function to determine what to compress
+  filter: (req, res) => {
+    // Don't compress if client doesn't support it
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    // Use compression's default filter
+    return compression.filter(req, res);
+  }
+}));
+
+log("✅ Response compression enabled (gzip/deflate)");
 
 // CORS middleware - must be before other middleware
 app.use((req, res, next) => {

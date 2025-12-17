@@ -22,30 +22,58 @@ class NotificationChecker {
    * Check all users for expiring food items and send notifications
    */
   async checkAndNotifyAll(): Promise<NotificationResult[]> {
-    console.log("[NotificationChecker] Starting notification check...");
+    console.log("[NotificationChecker] ========================================");
+    console.log("[NotificationChecker] 🔔 Starting notification check for all users...");
+    console.log("[NotificationChecker] ========================================");
 
     const results: NotificationResult[] = [];
+    let totalUsers = 0;
+    let usersWithNotifications = 0;
+    let usersSkipped = 0;
+    let usersFailed = 0;
 
     try {
       // Get all users
       const users = await storage.getAllUsers();
-      console.log(`[NotificationChecker] Found ${users.length} users to check`);
+      totalUsers = users.length;
+      console.log(`[NotificationChecker] 📊 Found ${totalUsers} total users to check`);
+
+      if (totalUsers === 0) {
+        console.log("[NotificationChecker] ⚠️ No users found in database");
+        return results;
+      }
 
       for (const user of users) {
         try {
+          console.log(`[NotificationChecker] 👤 Checking user: ${user.username} (${user.email})`);
           const result = await this.checkAndNotifyUser(user);
+
           if (result) {
             results.push(result);
+            usersWithNotifications++;
+            console.log(`[NotificationChecker] ✅ Notifications sent to ${user.username}: Email=${result.emailSent}, Push=${result.pushSent}, WhatsApp=${result.whatsappSent}, SMS=${result.smsSent}, Telegram=${result.telegramSent}`);
+          } else {
+            usersSkipped++;
+            console.log(`[NotificationChecker] ⏭️ Skipped ${user.username} (no expiring items or notifications disabled)`);
           }
         } catch (error) {
-          console.error(`[NotificationChecker] Error checking user ${user.id}:`, error);
+          usersFailed++;
+          console.error(`[NotificationChecker] ❌ Error checking user ${user.username} (${user.id}):`, error instanceof Error ? error.message : String(error));
+          // Continue processing other users even if one fails
         }
       }
 
-      console.log(`[NotificationChecker] Notification check completed. Sent ${results.length} notifications.`);
+      console.log("[NotificationChecker] ========================================");
+      console.log("[NotificationChecker] 📊 Notification check completed:");
+      console.log(`[NotificationChecker]    Total users: ${totalUsers}`);
+      console.log(`[NotificationChecker]    Notifications sent: ${usersWithNotifications}`);
+      console.log(`[NotificationChecker]    Skipped: ${usersSkipped}`);
+      console.log(`[NotificationChecker]    Failed: ${usersFailed}`);
+      console.log("[NotificationChecker] ========================================");
+
       return results;
     } catch (error) {
-      console.error("[NotificationChecker] Error during notification check:", error);
+      console.error("[NotificationChecker] ❌ Critical error during notification check:", error);
       return results;
     }
   }

@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { safeLocalStorage } from "@/lib/storage";
 import { API_BASE_URL } from "@/lib/api";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -285,40 +286,40 @@ export default function DashboardPage() {
             </Button>
           </div>
 
-         {stats.expiring > 0 && (
-         <Alert 
-          className="border-l-4 border-l-expiring bg-expiring/5 cursor-pointer hover:bg-expiring/10 transition-all duration-200"
-          onClick={() => setFilterStatus("expiring")}
-           >
-           <AlertCircle className="h-5 w-5 text-expiring" />
-      <AlertDescription className="text-sm font-medium">
-      {(() => {
-        const expiringItems = foodItems.filter(i => i.status === "expiring");
-        if (expiringItems.length === 0) return null;
-        
-        const minDays = Math.min(...expiringItems.map(i => i.daysLeft));
-        const maxDays = Math.max(...expiringItems.map(i => i.daysLeft));
-        
-        if (minDays === maxDays) {
-          return (
-            <>
-              <span className="font-bold">{stats.expiring}</span> item{stats.expiring > 1 ? "s" : ""} expiring in{" "}
-              <span className="font-bold text-expiring">{minDays}</span> day{minDays !== 1 ? "s" : ""}. 
-              <span className="ml-1 underline">Click to view →</span>
-            </>
-          );
-        } else {
-          return (
-            <>
-              <span className="font-bold">{stats.expiring}</span> item{stats.expiring > 1 ? "s" : ""} expiring within{" "}
-              <span className="font-bold text-expiring">{minDays}-{maxDays}</span> days. 
-              <span className="ml-1 underline">Click to view →</span>
-            </>
-          );
-          }
-          })()}
-          </AlertDescription>
-          </Alert>
+          {stats.expiring > 0 && (
+            <Alert
+              className="border-l-4 border-l-expiring bg-expiring/5 cursor-pointer hover:bg-expiring/10 transition-all duration-200"
+              onClick={() => setFilterStatus("expiring")}
+            >
+              <AlertCircle className="h-5 w-5 text-expiring" />
+              <AlertDescription className="text-sm font-medium">
+                {(() => {
+                  const expiringItems = foodItems.filter(i => i.status === "expiring");
+                  if (expiringItems.length === 0) return null;
+
+                  const minDays = Math.min(...expiringItems.map(i => i.daysLeft));
+                  const maxDays = Math.max(...expiringItems.map(i => i.daysLeft));
+
+                  if (minDays === maxDays) {
+                    return (
+                      <>
+                        <span className="font-bold">{stats.expiring}</span> item{stats.expiring > 1 ? "s" : ""} expiring in{" "}
+                        <span className="font-bold text-expiring">{minDays}</span> day{minDays !== 1 ? "s" : ""}.
+                        <span className="ml-1 underline">Click to view →</span>
+                      </>
+                    );
+                  } else {
+                    return (
+                      <>
+                        <span className="font-bold">{stats.expiring}</span> item{stats.expiring > 1 ? "s" : ""} expiring within{" "}
+                        <span className="font-bold text-expiring">{minDays}-{maxDays}</span> days.
+                        <span className="ml-1 underline">Click to view →</span>
+                      </>
+                    );
+                  }
+                })()}
+              </AlertDescription>
+            </Alert>
           )}
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -380,10 +381,7 @@ export default function DashboardPage() {
           )}
 
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-16 space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground">Loading your food inventory...</p>
-            </div>
+            <DashboardSkeleton />
           ) : foodItems.length === 0 ? (
             <div className="text-center py-16">
               <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />

@@ -99,42 +99,62 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
 
   const subscribeToPush = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      toast({ 
-        title: "Not Supported", 
-        description: "Push notifications are not supported in this browser.", 
-        variant: "destructive" 
+      toast({
+        title: "Not Supported",
+        description: "Push notifications are not supported in this browser. Please use Chrome, Firefox, or Edge.",
+        variant: "destructive"
       });
       return false;
     }
 
     try {
       setIsSubscribing(true);
+      console.log("[Push] Starting push notification subscription...");
+
+      // Check current permission state
+      const currentPermission = Notification.permission;
+      console.log(`[Push] Current permission: ${currentPermission}`);
 
       // Request notification permission first
       const permission = await Notification.requestPermission();
+      console.log(`[Push] Permission result: ${permission}`);
+
       if (permission !== 'granted') {
-        toast({ 
-          title: "Permission Denied", 
-          description: "Please allow notifications in your browser settings to enable this feature.", 
-          variant: "destructive" 
+        toast({
+          title: "Permission Denied",
+          description: "Please allow notifications in your browser settings to enable this feature.",
+          variant: "destructive"
         });
         return false;
       }
 
-      // Register service worker
-      const register = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/'
-      });
+      // Check if service worker is already registered
+      let registration = await navigator.serviceWorker.getRegistration('/');
+
+      if (!registration) {
+        console.log("[Push] Registering service worker...");
+        // Register service worker
+        registration = await navigator.serviceWorker.register('/sw.js', {
+          scope: '/'
+        });
+        console.log("[Push] Service worker registered successfully");
+      } else {
+        console.log("[Push] Service worker already registered");
+      }
 
       // Wait for service worker to be ready
+      console.log("[Push] Waiting for service worker to be ready...");
       await navigator.serviceWorker.ready;
+      console.log("[Push] Service worker is ready");
 
       // Get VAPID public key from server
+      console.log("[Push] Fetching VAPID public key...");
       const response = await fetch(`${API_BASE_URL}/api/notifications/vapid-public-key`);
       if (!response.ok) {
-        throw new Error('Failed to get VAPID key');
+        throw new Error(`Failed to get VAPID key: ${response.status} ${response.statusText}`);
       }
       const { publicKey } = await response.json();
+      console.log("[Push] VAPID key received");
 
       // Convert base64 string to Uint8Array for subscribe options
       const urlBase64ToUint8Array = (base64String: string) => {
@@ -152,13 +172,24 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
 
       const convertedVapidKey = urlBase64ToUint8Array(publicKey);
 
+      // Check for existing subscription
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (subscription) {
+        console.log("[Push] Existing subscription found, unsubscribing first...");
+        await subscription.unsubscribe();
+      }
+
       // Subscribe to push notifications
-      const subscription = await register.pushManager.subscribe({
+      console.log("[Push] Subscribing to push notifications...");
+      subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: convertedVapidKey
       });
+      console.log("[Push] Push subscription successful");
 
       // Send subscription to server
+      console.log("[Push] Sending subscription to server...");
       const subscribeResponse = await fetch(`${API_BASE_URL}/api/notifications/subscribe`, {
         method: 'POST',
         body: JSON.stringify({ userId, subscription }),
@@ -167,21 +198,24 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
       });
 
       if (!subscribeResponse.ok) {
-        throw new Error('Failed to save subscription');
+        const errorData = await subscribeResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to save subscription: ${subscribeResponse.status}`);
       }
 
-      toast({ 
-        title: "Success!", 
-        description: "Browser notifications enabled successfully.", 
+      console.log("[Push] Subscription saved to server successfully");
+      toast({
+        title: "Success!",
+        description: "Browser notifications enabled successfully. You'll receive alerts for expiring items.",
       });
 
       return true;
     } catch (error) {
-      console.error("Push subscription error:", error);
-      toast({ 
-        title: "Subscription Failed", 
-        description: error instanceof Error ? error.message : "Could not subscribe to push notifications. Check permissions.", 
-        variant: "destructive" 
+      console.error("[Push] Subscription error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      toast({
+        title: "Subscription Failed",
+        description: `Could not enable browser notifications: ${errorMessage}`,
+        variant: "destructive"
       });
       return false;
     } finally {

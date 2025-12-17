@@ -107,53 +107,88 @@ class EmailService {
 
   async sendExpiryNotification(user: User, expiringItems: FoodItem[]): Promise<boolean> {
     if (!this.isConfigured()) {
-      console.warn("[EmailService] Email service not configured. Skipping email.");
+      console.warn(`[EmailService] ⚠️ Email service not configured. Skipping email for ${user.username}`);
       return false;
     }
 
-    console.log(`[EmailService] Attempting to send email to ${user.email} with ${expiringItems.length} items`);
+    if (!user.email) {
+      console.warn(`[EmailService] ⚠️ User ${user.username} has no email address`);
+      return false;
+    }
 
-    try {
-      const { subject, htmlContent, textContent } = this.generateEmailContent(user, expiringItems);
+    console.log(`[EmailService] 📧 Attempting to send email to ${user.email} (${user.username}) with ${expiringItems.length} expiring items`);
 
-      if (this.config!.service === "resend" && this.resendClient) {
-        // Send via Resend
-        console.log("[EmailService] Sending via Resend...");
-        const { data, error } = await this.resendClient.emails.send({
-          from: this.config!.from,
-          to: user.email,
-          subject,
-          html: htmlContent,
-          text: textContent,
-        });
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-        if (error) {
-          console.error("[EmailService] ❌ Resend API Error Response:", JSON.stringify(error, null, 2));
-          throw new Error(`Resend Error: ${error.message}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const { subject, htmlContent, textContent } = this.generateEmailContent(user, expiringItems);
+
+        if (this.config!.service === "resend" && this.resendClient) {
+          // Send via Resend
+          console.log(`[EmailService] Sending via Resend (attempt ${attempt}/${maxRetries})...`);
+          const { data, error } = await this.resendClient.emails.send({
+            from: this.config!.from,
+            to: user.email,
+            subject,
+            html: htmlContent,
+            text: textContent,
+          });
+
+          if (error) {
+            console.error(`[EmailService] ❌ Resend API Error (attempt ${attempt}/${maxRetries}):`, JSON.stringify(error, null, 2));
+            lastError = new Error(`Resend Error: ${error.message}`);
+
+            // Don't retry on certain errors
+            if (error.message?.includes('Invalid') || error.message?.includes('not found')) {
+              console.error(`[EmailService] ❌ Non-retryable error, aborting`);
+              break;
+            }
+
+            // Wait before retry (exponential backoff)
+            if (attempt < maxRetries) {
+              const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+              console.log(`[EmailService] ⏳ Waiting ${waitTime}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+              continue;
+            }
+          } else {
+            console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via Resend. ID: ${data?.id}`);
+            return true;
+          }
+        } else if (this.transporter) {
+          // Send via SMTP
+          console.log(`[EmailService] Sending via SMTP (attempt ${attempt}/${maxRetries})...`);
+          const info = await this.transporter.sendMail({
+            from: this.config!.from,
+            to: user.email,
+            subject,
+            text: textContent,
+            html: htmlContent,
+          });
+          console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via SMTP. ID: ${info.messageId}`);
+          return true;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[EmailService] ❌ Failed to send email (attempt ${attempt}/${maxRetries}):`, lastError.message);
+
+        if (error instanceof Error) {
+          console.error(`[EmailService] Error details:`, error.stack);
         }
 
-        console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via Resend. ID: ${data?.id}`);
-      } else if (this.transporter) {
-        // Send via SMTP
-        console.log("[EmailService] Sending via SMTP...");
-        const info = await this.transporter.sendMail({
-          from: this.config!.from,
-          to: user.email,
-          subject,
-          text: textContent,
-          html: htmlContent,
-        });
-        console.log(`[EmailService] ✅ Expiry notification sent to ${user.email} via SMTP. ID: ${info.messageId}`);
+        // Wait before retry (exponential backoff)
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000;
+          console.log(`[EmailService] ⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
       }
-
-      return true;
-    } catch (error) {
-      console.error("[EmailService] ❌ Failed to send email:", error);
-      if (error instanceof Error) {
-        console.error("[EmailService] Error details:", error.message, error.stack);
-      }
-      return false;
     }
+
+    console.error(`[EmailService] ❌ Failed to send email to ${user.email} after ${maxRetries} attempts. Last error:`, lastError?.message);
+    return false;
   }
 
   private generateEmailContent(user: User, expiringItems: FoodItem[]) {

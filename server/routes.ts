@@ -291,6 +291,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/food-items/:userId", async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
+
+      // Add cache headers (30 seconds)
+      res.setHeader('Cache-Control', 'private, max-age=30');
+      res.setHeader('ETag', `food-items-${userId}-${Date.now()}`);
+
       const items = await storage.getFoodItemsByUserId(userId);
       res.status(200).json({ items });
     } catch (error) {

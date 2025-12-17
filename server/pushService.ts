@@ -41,29 +41,40 @@ class PushService {
     }
 
     async sendExpiryNotification(user: User, expiringItems: FoodItem[]): Promise<boolean> {
-        if (!this.isConfigured() || !user.pushSubscriptions || user.pushSubscriptions.length === 0) {
+        if (!this.isConfigured()) {
+            console.log(`[PushService] Service not configured, skipping push for user ${user.username}`);
             return false;
         }
+
+        if (!user.pushSubscriptions || user.pushSubscriptions.length === 0) {
+            console.log(`[PushService] No push subscriptions found for user ${user.username}`);
+            return false;
+        }
+
+        console.log(`[PushService] Attempting to send push notification to ${user.username} (${user.pushSubscriptions.length} subscription(s))`);
 
         const itemsList = expiringItems
             .map(item => item.name)
             .join(", ");
 
         const count = expiringItems.length;
-        const title = `Food Expiry Alert: ${count} item${count > 1 ? 's' : ''}`;
+        const title = `🍎 Food Expiry Alert: ${count} item${count > 1 ? 's' : ''}`;
         const body = `Expiring soon: ${itemsList}`;
 
         const payload = JSON.stringify({
             title,
             body,
-            icon: '/icon-192.png', // Ensure this exists or use a placeholder
+            icon: '/icon-192.png',
+            badge: '/badge.png',
+            vibrate: [100, 50, 100],
             data: {
-                url: '/dashboard'
+                url: '/dashboard',
+                timestamp: Date.now()
             }
         });
 
         let successCount = 0;
-        const cleanupSubscriptions: string[] = [];
+        const failedSubscriptions: string[] = [];
 
         // Send to all subscriptions
         for (const subStr of user.pushSubscriptions) {
@@ -71,24 +82,30 @@ class PushService {
                 const sub = JSON.parse(subStr);
                 await webpush.sendNotification(sub, payload);
                 successCount++;
+                console.log(`[PushService] ✅ Push sent successfully to subscription endpoint: ${sub.endpoint.substring(0, 50)}...`);
             } catch (error: any) {
                 if (error.statusCode === 410 || error.statusCode === 404) {
                     // Subscription has expired or is no longer valid
-                    console.log("[PushService] Subscription expired, should remove");
-                    // In a real app, we should remove this subscription from DB
-                    // For now, we just log it. 
-                    // To implement cleanup: storage.removePushSubscription(user.id, subStr)
+                    console.log(`[PushService] ⚠️ Subscription expired (${error.statusCode}), marking for cleanup`);
+                    failedSubscriptions.push(subStr);
                 } else {
-                    console.error("[PushService] Error sending push:", error);
+                    console.error(`[PushService] ❌ Error sending push (${error.statusCode || 'unknown'}):`, error.message);
                 }
             }
         }
 
+        // Log cleanup info (in future, implement actual cleanup)
+        if (failedSubscriptions.length > 0) {
+            console.log(`[PushService] 🗑️ ${failedSubscriptions.length} expired subscription(s) should be removed for user ${user.username}`);
+            // TODO: Implement storage.removePushSubscriptions(user.id, failedSubscriptions)
+        }
+
         if (successCount > 0) {
-            console.log(`[PushService] ✅ Sent ${successCount} push notifications to ${user.username}`);
+            console.log(`[PushService] ✅ Successfully sent ${successCount}/${user.pushSubscriptions.length} push notifications to ${user.username}`);
             return true;
         }
 
+        console.log(`[PushService] ❌ Failed to send any push notifications to ${user.username}`);
         return false;
     }
 }
