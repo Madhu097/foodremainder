@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Bell, Mail, MessageCircle, Loader2, CheckCircle2, AlertCircle, Send, Globe, Moon, Smartphone } from "lucide-react";
+import { Bell, Mail, MessageCircle, CheckCircle2, AlertCircle, Send, Globe, Moon, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { API_BASE_URL } from "@/lib/api";
+import { FoodLoader, BouncingFoodLoader } from "@/components/FoodLoader";
 
 interface NotificationPreferences {
   emailNotifications: boolean;
@@ -320,7 +321,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <FoodLoader size="lg" />
           </div>
         </CardContent>
       </Card>
@@ -679,7 +680,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <BouncingFoodLoader size="sm" className="mr-2" />
                   Saving...
                 </>
               ) : (
@@ -694,7 +695,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             >
               {isTesting ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <BouncingFoodLoader size="sm" className="mr-2" />
                   Sending...
                 </>
               ) : (

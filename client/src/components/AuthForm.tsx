@@ -37,7 +37,6 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
 
   // Reset form data when mode changes
   useEffect(() => {
-    console.log("[AuthForm] Mode changed to:", mode);
     setFormData(
       mode === "register" 
         ? { username: "", email: "", mobile: "", password: "" }
@@ -79,15 +78,9 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("[AuthForm] Submit triggered, mode:", mode);
-    console.log("[AuthForm] Form data:", { ...formData, password: "***" });
-    console.log("[AuthForm] Has onSubmit handler:", !!onSubmit);
     
     if (validateForm()) {
-      console.log("[AuthForm] Validation passed, calling onSubmit");
       onSubmit?.(formData);
-    } else {
-      console.log("[AuthForm] Validation failed, errors:", validationErrors);
     }
   };
 

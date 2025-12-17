@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createHash } from "crypto";
 import { emailService } from "./emailService";
 import { whatsappService } from "./whatsappService";
+import { whatsappCloudService } from "./whatsappCloudService";
 import { smsService } from "./smsService";
 import { telegramService } from "./telegramService";
 import { pushService } from "./pushService";
@@ -30,6 +31,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       services: {
         email: emailService.isConfigured(),
         whatsapp: whatsappService.isConfigured(),
+        whatsappCloud: whatsappCloudService.isConfigured(),
         telegram: telegramService.isConfigured(),
         push: pushService.isConfigured(),
       },
@@ -292,15 +294,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
 
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
       // Add cache headers (30 seconds)
       res.setHeader('Cache-Control', 'private, max-age=30');
       res.setHeader('ETag', `food-items-${userId}-${Date.now()}`);
 
       const items = await storage.getFoodItemsByUserId(userId);
       res.status(200).json({ items });
-    } catch (error) {
+    } catch (error: any) {
       console.error("[FoodItems] Get items error:", error);
-      res.status(500).json({ message: "Failed to fetch food items" });
+      console.error("[FoodItems] Error message:", error?.message);
+      console.error("[FoodItems] Error stack:", error?.stack);
+      res.status(500).json({ message: "Failed to fetch food items", error: error?.message });
     }
   });
 
@@ -401,6 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         servicesConfigured: {
           email: emailService.isConfigured(),
           whatsapp: whatsappService.isConfigured(),
+          whatsappCloud: whatsappCloudService.isConfigured(),
           sms: smsService.isConfigured(),
           telegram: telegramService.isConfigured(),
           push: pushService.isConfigured(),

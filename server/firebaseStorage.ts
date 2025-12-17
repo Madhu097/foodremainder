@@ -290,33 +290,61 @@ export class FirebaseStorage implements IStorage {
 
     // Food item methods
     async getFoodItemsByUserId(userId: string): Promise<FoodItem[]> {
-        if (!db) throw new Error("Firestore not initialized");
+        if (!db) {
+            console.error("[FirebaseStorage] Firestore not initialized!");
+            throw new Error("Firestore not initialized");
+        }
 
         // Check cache first
         const cacheKey = `foodItems:${userId}`;
         const cached = this.foodItemsCache.get(cacheKey);
         if (cached) {
-            console.log(`[FirebaseStorage] 🚀 Cache hit for food items: ${userId} (${cached.length} items)`);
             return cached;
         }
 
-        console.log(`[FirebaseStorage] 💾 Fetching food items from database for user: ${userId}`);
-        const startTime = Date.now();
+        try {
+            // Try with orderBy first (requires Firestore index)
+            const snapshot = await db.collection('foodItems')
+                .where('userId', '==', userId)
+                .orderBy('expiryDate', 'asc')
+                .get();
 
-        const snapshot = await db.collection('foodItems')
-            .where('userId', '==', userId)
-            .orderBy('expiryDate', 'asc') // Order by expiry date for better UX
-            .get();
+            const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
+            
+            // Cache the results
+            this.foodItemsCache.set(cacheKey, items);
+            
+            return items;
+        } catch (error: any) {
+            console.error(`[FirebaseStorage] Error fetching items:`, error);
+            console.error(`[FirebaseStorage] Error code:`, error.code);
+            console.error(`[FirebaseStorage] Error message:`, error.message);
+            
+            // If orderBy fails (no index), fallback to query without orderBy
+            if (error.code === 9 || error.code === '9' || error.message?.includes('index') || error.message?.includes('requires an index') || error.message?.includes('FAILED_PRECONDITION')) {
+                console.log(`[FirebaseStorage] ⚠️ Index not available, using fallback query without orderBy`);
+                try {
+                    const snapshot = await db.collection('foodItems')
+                        .where('userId', '==', userId)
+                        .get();
 
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
-        const duration = Date.now() - startTime;
-
-        console.log(`[FirebaseStorage] ✅ Fetched ${items.length} food items in ${duration}ms`);
-
-        // Cache the results
-        this.foodItemsCache.set(cacheKey, items);
-
-        return items;
+                    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
+                    
+                    // Sort in memory by expiry date
+                    items.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+                    
+                    // Cache the results
+                    this.foodItemsCache.set(cacheKey, items);
+                    
+                    return items;
+                } catch (fallbackError) {
+                    console.error(`[FirebaseStorage] Fallback query also failed:`, fallbackError);
+                    throw fallbackError;
+                }
+            }
+            // Re-throw other errors
+            throw error;
+        }
     }
 
     async getFoodItem(id: string): Promise<FoodItem | undefined> {

@@ -7,6 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { emailService } from "./emailService";
 import { whatsappService } from "./whatsappService";
+import { whatsappCloudService } from "./whatsappCloudService";
 import { smsService } from "./smsService";
 import { telegramService } from "./telegramService";
 import { pushService } from "./pushService";
@@ -112,6 +113,7 @@ function initializeServices() {
   log("Initializing notification services...");
   const emailInitialized = emailService.initialize();
   const whatsappInitialized = whatsappService.initialize();
+  const whatsappCloudInitialized = whatsappCloudService.initialize();
   const smsInitialized = smsService.initialize();
   const telegramInitialized = telegramService.initialize();
   const pushInitialized = pushService.initialize();
@@ -123,9 +125,11 @@ function initializeServices() {
   }
 
   if (whatsappInitialized) {
-    log("✓ WhatsApp notifications enabled");
+    log("✓ WhatsApp notifications enabled (Twilio)");
+  } else if (whatsappCloudInitialized) {
+    log("✓ WhatsApp notifications enabled (FREE Cloud API)");
   } else {
-    log("⚠ WhatsApp notifications disabled (configure TWILIO_* environment variables)");
+    log("⚠ WhatsApp notifications disabled (configure TWILIO_* or WHATSAPP_CLOUD_* environment variables)");
   }
 
   if (smsInitialized) {

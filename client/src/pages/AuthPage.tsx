@@ -43,9 +43,6 @@ export default function AuthPage() {
     try {
       const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
       const fullUrl = `${API_BASE_URL}${endpoint}`;
-      console.log("[Auth] Sending request to:", fullUrl);
-      console.log("[Auth] API_BASE_URL:", API_BASE_URL);
-      console.log("[Auth] Request data:", { ...data, password: "***" });
       
       const response = await fetch(fullUrl, {
         method: "POST",
@@ -56,24 +53,7 @@ export default function AuthPage() {
         credentials: "include",
       });
 
-      console.log("[Auth] Response status:", response.status);
-      console.log("[Auth] Response ok:", response.ok);
-      console.log("[Auth] Response headers:", Object.fromEntries(response.headers.entries()));
-
-      // Get response as text first to see what we're getting
-      const responseText = await response.text();
-      console.log("[Auth] Response text:", responseText);
-
-      let result;
-      try {
-        result = JSON.parse(responseText);
-        console.log("[Auth] Parsed response data:", result);
-      } catch (parseError) {
-        console.error("[Auth] Failed to parse JSON response:", parseError);
-        console.error("[Auth] Response was:", responseText.substring(0, 500));
-        setError(`Server error: ${responseText.substring(0, 100) || 'Invalid response format'}`);
-        return;
-      }
+      const result = await response.json();
 
       if (!response.ok) {
         // Handle validation errors
@@ -87,7 +67,6 @@ export default function AuthPage() {
       }
 
       // Success!
-      console.log("[Auth] Success! User:", result.user);
       toast({
         title: mode === "register" ? "Account created!" : "Welcome back!",
         description: result.message,

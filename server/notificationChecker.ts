@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { emailService } from "./emailService";
 import { whatsappService } from "./whatsappService";
+import { whatsappCloudService } from "./whatsappCloudService";
 import { smsService } from "./smsService";
 import { telegramService } from "./telegramService";
 import { pushService } from "./pushService";
@@ -159,9 +160,13 @@ class NotificationChecker {
       result.emailSent = await emailService.sendExpiryNotification(user, expiringItems);
     }
 
-    // Send WhatsApp notification
-    if (whatsappEnabled && whatsappService.isConfigured()) {
-      result.whatsappSent = await whatsappService.sendExpiryNotification(user, expiringItems);
+    // Send WhatsApp notification (try free Cloud API first, then Twilio)
+    if (whatsappEnabled) {
+      if (whatsappCloudService.isConfigured()) {
+        result.whatsappSent = await whatsappCloudService.sendExpiryNotification(user, expiringItems);
+      } else if (whatsappService.isConfigured()) {
+        result.whatsappSent = await whatsappService.sendExpiryNotification(user, expiringItems);
+      }
     }
 
     // Send SMS notification

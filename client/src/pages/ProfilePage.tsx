@@ -12,6 +12,7 @@ import { NotificationSettings } from "@/components/NotificationSettings";
 import { safeLocalStorage } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/api";
+import { BouncingFoodLoader } from "@/components/FoodLoader";
 import {
   Dialog,
   DialogContent,
@@ -591,7 +592,7 @@ export default function ProfilePage() {
                 >
                   {uploadingImage ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                      <BouncingFoodLoader size="sm" />
                       <span>Uploading...</span>
                     </>
                   ) : (

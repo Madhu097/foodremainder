@@ -1,9 +1,18 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { FoodLoader } from "@/components/FoodLoader";
 
 export function DashboardSkeleton() {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            {/* Loading indicator */}
+            <div className="flex justify-center items-center py-12">
+                <div className="text-center space-y-4">
+                    <FoodLoader size="lg" />
+                    <p className="text-muted-foreground text-sm">Loading your food items...</p>
+                </div>
+            </div>
+            
             {/* Header skeleton */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
