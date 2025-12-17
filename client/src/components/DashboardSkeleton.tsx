@@ -7,8 +7,8 @@ export function DashboardSkeleton() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
             {/* Loading indicator */}
             <div className="flex justify-center items-center py-12">
-                <div className="text-center space-y-4">
-                    <FoodLoader size="lg" />
+                <div className="flex flex-col items-center space-y-4">
+                    <FoodLoader size="lg" className="mx-auto" />
                     <p className="text-muted-foreground text-sm">Loading your food items...</p>
                 </div>
             </div>

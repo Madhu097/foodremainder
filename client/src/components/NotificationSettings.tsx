@@ -24,6 +24,7 @@ interface NotificationPreferences {
   servicesConfigured?: {
     email: boolean;
     whatsapp: boolean;
+    whatsappCloud?: boolean;
     sms: boolean;
     telegram: boolean;
     push: boolean;
@@ -320,8 +321,9 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <FoodLoader size="lg" />
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <FoodLoader size="lg" className="mx-auto" />
+            <p className="text-muted-foreground text-sm">Loading settings...</p>
           </div>
         </CardContent>
       </Card>
@@ -445,7 +447,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
               onCheckedChange={(checked) =>
                 setPreferences({ ...preferences, whatsappNotifications: checked })
               }
-              disabled={!preferences.servicesConfigured?.whatsapp}
+              disabled={!(preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud)}
             />
           </div>
 

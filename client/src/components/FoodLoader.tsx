@@ -7,13 +7,13 @@ interface FoodLoaderProps {
 
 export function FoodLoader({ className = "", size = "md" }: FoodLoaderProps) {
   const sizeClasses = {
-    sm: "w-4 h-4",
-    md: "w-8 h-8",
-    lg: "w-12 h-12",
+    sm: "w-8 h-8",
+    md: "w-12 h-12",
+    lg: "w-16 h-16",
   };
 
   return (
-    <div className={`relative ${sizeClasses[size]} ${className}`}>
+    <div className={`relative ${sizeClasses[size]} mx-auto ${className}`}>
       {/* Clock face */}
       <motion.div
         className="absolute inset-0 rounded-full border-2 border-primary/30"
@@ -119,7 +119,7 @@ export function FoodLoader({ className = "", size = "md" }: FoodLoaderProps) {
 // Alternative: Simpler bouncing food loader
 export function BouncingFoodLoader({ className = "", size = "md" }: FoodLoaderProps) {
   const sizeClasses = {
-    sm: "text-sm",
+    sm: "text-base",
     md: "text-2xl",
     lg: "text-4xl",
   };
@@ -127,7 +127,7 @@ export function BouncingFoodLoader({ className = "", size = "md" }: FoodLoaderPr
   const foods = ["🍎", "🍞", "🥛", "🧀"];
 
   return (
-    <div className={`flex gap-2 ${className}`}>
+    <div className={`flex gap-2 items-center justify-center ${className}`}>
       {foods.map((food, index) => (
         <motion.div
           key={index}
@@ -152,13 +152,13 @@ export function BouncingFoodLoader({ className = "", size = "md" }: FoodLoaderPr
 // Hourglass with food
 export function FoodHourglassLoader({ className = "", size = "md" }: FoodLoaderProps) {
   const sizeClasses = {
-    sm: "w-6 h-8",
-    md: "w-8 h-12",
-    lg: "w-12 h-16",
+    sm: "w-8 h-10",
+    md: "w-12 h-16",
+    lg: "w-16 h-24",
   };
 
   return (
-    <div className={`relative ${sizeClasses[size]} ${className}`}>
+    <div className={`relative ${sizeClasses[size]} mx-auto ${className}`}>
       {/* Hourglass shape */}
       <svg className="w-full h-full text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M6 2h12M6 22h12M6 2v6l6 6-6 6v6M18 2v6l-6 6 6 6v6" />
