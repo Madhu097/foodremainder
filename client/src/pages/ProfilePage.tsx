@@ -603,20 +603,28 @@ export default function ProfilePage() {
                             });
 
                             if (response.ok) {
+                              // Clear localStorage and session
+                              localStorage.removeItem('user');
+                              localStorage.clear();
+                              
                               toast({
                                 title: "Account Deleted",
                                 description: "Your account has been permanently deleted.",
                               });
+                              
+                              // Redirect after a brief delay
                               setTimeout(() => {
                                 window.location.href = '/';
                               }, 1500);
                             } else {
-                              throw new Error('Failed to delete account');
+                              const errorData = await response.json().catch(() => ({}));
+                              throw new Error(errorData.message || 'Failed to delete account');
                             }
-                          } catch (error) {
+                          } catch (error: any) {
+                            console.error('[Profile] Delete account error:', error);
                             toast({
                               title: "Error",
-                              description: "Failed to delete account. Please try again.",
+                              description: error.message || "Failed to delete account. Please try again.",
                               variant: "destructive",
                             });
                           }

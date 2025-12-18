@@ -155,10 +155,15 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
 
       if (!registration) {
         console.log("[Push] Registering service worker...");
-        registration = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/'
-        });
-        console.log("[Push] Service worker registered successfully");
+        try {
+          registration = await navigator.serviceWorker.register('/sw.js', {
+            scope: '/'
+          });
+          console.log("[Push] Service worker registered successfully");
+        } catch (swError: any) {
+          console.error("[Push] Service worker registration failed:", swError);
+          throw new Error(`Service worker registration failed: ${swError.message}. This may not work on some mobile browsers.`);
+        }
       } else {
         console.log("[Push] Service worker already registered");
       }

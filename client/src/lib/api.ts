@@ -13,13 +13,22 @@ export const getApiBaseUrl = (): string => {
   console.log('[API Config] VITE_API_URL:', import.meta.env.VITE_API_URL);
   console.log('[API Config] import.meta.env.PROD:', import.meta.env.PROD);
 
-  // If running locally (localhost), always use relative URL to avoid CORS/Render issues
-  if (isLocalhost) {
-    console.log('[API Config] Localhost detected, forcing relative URL');
+  // If running locally in development mode, use relative URL
+  if (isLocalhost && !import.meta.env.PROD) {
+    console.log('[API Config] Localhost detected (dev mode), using relative URL');
     console.log('[API Config] ========================================');
     console.log('[API Config] Final API_BASE_URL:', '');
     console.log('[API Config] ========================================');
     return '';
+  }
+
+  // If running production build on localhost, connect to local backend
+  if (isLocalhost && import.meta.env.PROD) {
+    console.log('[API Config] Localhost detected (prod build), connecting to local backend');
+    console.log('[API Config] ========================================');
+    console.log('[API Config] Final API_BASE_URL:', 'http://localhost:5000');
+    console.log('[API Config] ========================================');
+    return 'http://localhost:5000';
   }
 
   // Check for Vite environment variable
