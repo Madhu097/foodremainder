@@ -127,24 +127,53 @@ Error: Invalid service account
 
 ### ✅ Solution
 
-The `FIREBASE_PRIVATE_KEY` needs special formatting in Render:
+The `FIREBASE_PRIVATE_KEY` needs special formatting in Render.
 
-#### Correct Format:
+#### Error in Logs:
 ```
-"-----BEGIN PRIVATE KEY-----\nMIIEvQI...\n-----END PRIVATE KEY-----\n"
+error:1E08010C:DECODER routines::unsupported
+Getting metadata from plugin failed
 ```
 
-⚠️ **Important**:
-- Must include the quotes at start and end
-- Must have `\n` for newlines (not actual newlines)
-- Must be all on ONE line
+This means the private key is malformed.
 
-#### How to Fix:
+#### Correct Format in Render:
 
-1. Copy the value from your `.env` file
-2. It should look like: `"-----BEGIN PRIVATE KEY-----\nMIIE...`
-3. Paste the ENTIRE value (including quotes) into Render
-4. Save and redeploy
+**Option 1: Copy from `.env` file (Recommended)**
+
+1. Open your local `.env` file
+2. Find the line starting with `FIREBASE_PRIVATE_KEY=`
+3. Copy the ENTIRE value after the `=` (including quotes)
+4. Example: `"-----BEGIN PRIVATE KEY-----\nMIIEvQI...\n-----END PRIVATE KEY-----\n"`
+5. Paste into Render environment variable
+6. ⚠️ **Keep the quotes and `\n` characters exactly as they are**
+
+**Option 2: Manual entry**
+
+In Render, enter the value exactly like this (single line):
+```
+"-----BEGIN PRIVATE KEY-----\nYourKeyContentHere\n-----END PRIVATE KEY-----\n"
+```
+
+⚠️ **Critical Rules**:
+- ✅ **Include** the double quotes at start and end
+- ✅ **Use** `\n` (backslash-n, not actual Enter key)
+- ✅ **Single line** - don't press Enter
+- ❌ **Don't** use actual newlines/line breaks
+- ❌ **Don't** remove the quotes
+
+#### Step-by-Step Fix:
+
+1. **Go to Render**: Dashboard → Your service → Environment
+2. **Find**: `FIREBASE_PRIVATE_KEY` variable
+3. **Delete** current value
+4. **Open** your local `.env` file
+5. **Copy** the entire value from `FIREBASE_PRIVATE_KEY=` line (with quotes)
+6. **Paste** into Render
+7. **Verify**: Should look like `"-----BEGIN PRIVATE KEY-----\nMIIE...`
+8. **Save Changes**
+9. **Manual Deploy** → Deploy latest commit
+10. **Check logs** - should see `✅ Connected to Firebase Firestore`
 
 ---
 
