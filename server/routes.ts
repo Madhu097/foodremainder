@@ -120,8 +120,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = loginSchema.parse(req.body);
 
+      // Normalize identifier: if it's a mobile number without country code, add +91
+      let identifier = validatedData.identifier.trim();
+      
+      // Check if identifier looks like a mobile number (only digits, possibly with +)
+      const isMobileNumber = /^[+]?[0-9]{10,15}$/.test(identifier);
+      if (isMobileNumber && !identifier.startsWith('+')) {
+        identifier = '+91' + identifier;
+        console.log(`[Auth] Auto-added +91 prefix to login identifier: ${identifier}`);
+      }
+
       // Find user by email or mobile
-      const user = await storage.getUserByEmailOrMobile(validatedData.identifier);
+      const user = await storage.getUserByEmailOrMobile(identifier);
 
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
@@ -176,8 +186,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
       }
 
+      // Normalize identifier: if it's a mobile number without country code, add +91
+      let normalizedIdentifier = identifier.trim();
+      const isMobileNumber = /^[+]?[0-9]{10,15}$/.test(normalizedIdentifier);
+      if (isMobileNumber && !normalizedIdentifier.startsWith('+')) {
+        normalizedIdentifier = '+91' + normalizedIdentifier;
+        console.log(`[Auth] Auto-added +91 prefix to reset identifier: ${normalizedIdentifier}`);
+      }
+
       // Find user by email or mobile
-      const user = await storage.getUserByEmailOrMobile(identifier);
+      const user = await storage.getUserByEmailOrMobile(normalizedIdentifier);
 
       if (!user) {
         return res.status(404).json({ message: "User not found" });
