@@ -246,13 +246,14 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
                       <Input
                         id="mobile"
                         type="tel"
-                        placeholder="+1234567890"
+                        placeholder="9876543210"
                         value={(formData as RegisterFormData).mobile}
                         onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                         required
                         data-testid="input-mobile"
                         className={`transition-all focus:scale-[1.02] ${validationErrors.mobile ? 'border-red-500' : ''}`}
                       />
+                      <p className="text-xs text-muted-foreground">+91 will be added automatically for Indian numbers</p>
                       {validationErrors.mobile && (
                         <p className="text-xs text-red-500">{validationErrors.mobile}</p>
                       )}

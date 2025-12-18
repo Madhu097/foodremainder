@@ -57,6 +57,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertUserSchema.parse(req.body);
 
+      // Normalize mobile number: add +91 if no country code
+      let mobile = validatedData.mobile.trim();
+      if (!mobile.startsWith('+')) {
+        mobile = '+91' + mobile;
+        console.log(`[Auth] Auto-added +91 prefix to mobile: ${mobile}`);
+      }
+
       // Check if username already exists
       const existingUsername = await storage.getUserByUsername(validatedData.username);
       if (existingUsername) {
@@ -70,7 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if mobile already exists
-      const existingMobile = await storage.getUserByMobile(validatedData.mobile);
+      const existingMobile = await storage.getUserByMobile(mobile);
       if (existingMobile) {
         return res.status(400).json({ message: "Mobile number already registered" });
       }
@@ -78,9 +85,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = hashPassword(validatedData.password);
 
-      // Create user
+      // Create user with normalized mobile number
       const user = await storage.createUser({
         ...validatedData,
+        mobile: mobile,
         password: hashedPassword,
       });
 
@@ -438,12 +446,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quietHoursEnd
       } = req.body;
 
+      console.log(`[Notifications] Updating preferences for user: ${userId}`);
+      console.log(`[Notifications] Request body:`, req.body);
+      console.log(`[Notifications] whatsappNotifications value:`, whatsappNotifications, typeof whatsappNotifications);
+      console.log(`[Notifications] browserNotifications value:`, browserNotifications, typeof browserNotifications);
+
       const preferences: any = {};
       if (typeof emailNotifications === "boolean") {
         preferences.emailNotifications = emailNotifications ? "true" : "false";
       }
       if (typeof whatsappNotifications === "boolean") {
         preferences.whatsappNotifications = whatsappNotifications ? "true" : "false";
+        console.log(`[Notifications] Setting whatsappNotifications to: "${preferences.whatsappNotifications}"`);
       }
       if (typeof smsNotifications === "boolean") {
         preferences.smsNotifications = smsNotifications ? "true" : "false";
@@ -453,6 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (typeof browserNotifications === "boolean") {
         preferences.browserNotifications = browserNotifications ? "true" : "false";
+        console.log(`[Notifications] Setting browserNotifications to: "${preferences.browserNotifications}"`);
       }
       if (telegramChatId !== undefined) {
         preferences.telegramChatId = telegramChatId;
@@ -467,11 +482,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         preferences.notificationsPerDay = notificationsPerDay.toString();
       }
 
+      console.log(`[Notifications] Preferences to save:`, preferences);
+
       const updated = await storage.updateNotificationPreferences(userId, preferences);
 
       if (!updated) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      console.log(`[Notifications] ✅ Preferences updated successfully for user: ${userId}`);
 
       res.status(200).json({
         message: "Notification preferences updated successfully",
@@ -480,6 +499,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[Notifications] Update preferences error:", error);
       res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
+  // Delete user account
+  app.delete("/api/user/:userId", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      console.log(`[User] Delete account request for user: ${userId}`);
+      
+      // Delete user's food items first
+      const foodItems = await storage.getFoodItemsByUserId(userId);
+      for (const item of foodItems) {
+        await storage.deleteFoodItem(item.id, userId);
+      }
+      console.log(`[User] Deleted ${foodItems.length} food items`);
+      
+      // Delete user
+      const deleted = await storage.deleteUser(userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      console.log(`[User] ✅ Account deleted successfully: ${userId}`);
+      res.status(200).json({ message: "Account deleted successfully" });
+    } catch (error) {
+      console.error("[User] Delete account error:", error);
+      res.status(500).json({ message: "Failed to delete account" });
     }
   });
 

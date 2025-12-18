@@ -2,6 +2,7 @@ import { type User, type InsertUser, type FoodItem, type InsertFoodItem } from "
 import type { IStorage } from "./storage";
 import { randomUUID } from "crypto";
 import { db } from "./firebase";
+import admin from "firebase-admin";
 
 // Simple in-memory cache with TTL
 class Cache<T> {
@@ -192,6 +193,7 @@ export class FirebaseStorage implements IStorage {
             id,
             emailNotifications: "true",
             whatsappNotifications: "false",
+            smsNotifications: "false",
             telegramNotifications: "false",
             telegramChatId: null,
             notificationDays: "3",
@@ -252,6 +254,24 @@ export class FirebaseStorage implements IStorage {
         }
     }
 
+    async deleteUser(userId: string): Promise<boolean> {
+        if (!db) throw new Error("Firestore not initialized");
+        try {
+            await db.collection('users').doc(userId).delete();
+
+            // Invalidate all user caches
+            this.userCache.invalidate(userId);
+            this.userCache.invalidatePattern(userId);
+            this.allUsersCache.clear();
+
+            console.log(`[FirebaseStorage] ✅ Deleted user: ${userId}`);
+            return true;
+        } catch (error) {
+            console.error(`[FirebaseStorage] ❌ Failed to delete user: ${userId}`, error);
+            return false;
+        }
+    }
+
     async updateNotificationPreferences(
         userId: string,
         preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
@@ -270,23 +290,56 @@ export class FirebaseStorage implements IStorage {
         }
     }
 
+    // In firebaseStorage.ts, replace the addPushSubscription method with:
     async addPushSubscription(userId: string, subscription: string): Promise<boolean> {
         if (!db) throw new Error("Firestore not initialized");
         try {
+            console.log(`[FirebaseStorage] Adding push subscription for user: ${userId}`);
+
+            // First check if user exists
+            const userDoc = await db.collection('users').doc(userId).get();
+            if (!userDoc.exists) {
+                console.error(`[FirebaseStorage] User not found: ${userId}`);
+                return false;
+            }
+
             const userRef = db.collection('users').doc(userId);
+
+            // Use arrayUnion to add subscription without duplicates
             await userRef.update({
-                pushSubscriptions: require('firebase-admin').firestore.FieldValue.arrayUnion(subscription)
+                pushSubscriptions: admin.firestore.FieldValue.arrayUnion(subscription)
             });
 
-            // Invalidate user cache
+            console.log(`[FirebaseStorage] Push subscription added successfully for user: ${userId}`);
             this.userCache.invalidate(userId);
-
             return true;
-        } catch (error) {
+        } catch (error: any) {
             console.error("[FirebaseStorage] Failed to add push subscription:", error);
+            console.error("[FirebaseStorage] Error code:", error.code);
+            console.error("[FirebaseStorage] Error message:", error.message);
+
+            // If the field doesn't exist, try to create it
+            if (error.code === 'not-found' || error.message?.includes('No document to update')) {
+                try {
+                    console.log(`[FirebaseStorage] Attempting to create pushSubscriptions field for user: ${userId}`);
+                    await db.collection('users').doc(userId).set({
+                        pushSubscriptions: [subscription]
+                    }, { merge: true });
+
+                    console.log(`[FirebaseStorage] Push subscription field created and subscription added for user: ${userId}`);
+                    this.userCache.invalidate(userId);
+                    return true;
+                } catch (retryError) {
+                    console.error("[FirebaseStorage] Failed to create pushSubscriptions field:", retryError);
+                    return false;
+                }
+            }
+
             return false;
         }
     }
+
+
 
     // Food item methods
     async getFoodItemsByUserId(userId: string): Promise<FoodItem[]> {
@@ -310,16 +363,16 @@ export class FirebaseStorage implements IStorage {
                 .get();
 
             const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
-            
+
             // Cache the results
             this.foodItemsCache.set(cacheKey, items);
-            
+
             return items;
         } catch (error: any) {
             console.error(`[FirebaseStorage] Error fetching items:`, error);
             console.error(`[FirebaseStorage] Error code:`, error.code);
             console.error(`[FirebaseStorage] Error message:`, error.message);
-            
+
             // If orderBy fails (no index), fallback to query without orderBy
             if (error.code === 9 || error.code === '9' || error.message?.includes('index') || error.message?.includes('requires an index') || error.message?.includes('FAILED_PRECONDITION')) {
                 console.log(`[FirebaseStorage] ⚠️ Index not available, using fallback query without orderBy`);
@@ -329,13 +382,13 @@ export class FirebaseStorage implements IStorage {
                         .get();
 
                     const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
-                    
+
                     // Sort in memory by expiry date
                     items.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
-                    
+
                     // Cache the results
                     this.foodItemsCache.set(cacheKey, items);
-                    
+
                     return items;
                 } catch (fallbackError) {
                     console.error(`[FirebaseStorage] Fallback query also failed:`, fallbackError);

@@ -41,17 +41,29 @@ class PushService {
     }
 
     async sendExpiryNotification(user: User, expiringItems: FoodItem[]): Promise<boolean> {
+        console.log(`[PushService] ========================================`);
+        console.log(`[PushService] Starting push notification for user: ${user.username}`);
+        console.log(`[PushService] User ID: ${user.id}`);
+        console.log(`[PushService] Expiring items count: ${expiringItems.length}`);
+
         if (!this.isConfigured()) {
-            console.log(`[PushService] Service not configured, skipping push for user ${user.username}`);
+            console.log(`[PushService] ❌ Service not configured, skipping push for user ${user.username}`);
+            console.log(`[PushService] ========================================`);
             return false;
         }
+
+        console.log(`[PushService] ✅ Service is configured`);
+        console.log(`[PushService] User pushSubscriptions:`, user.pushSubscriptions);
+        console.log(`[PushService] pushSubscriptions type:`, typeof user.pushSubscriptions);
+        console.log(`[PushService] pushSubscriptions length:`, user.pushSubscriptions?.length);
 
         if (!user.pushSubscriptions || user.pushSubscriptions.length === 0) {
-            console.log(`[PushService] No push subscriptions found for user ${user.username}`);
+            console.log(`[PushService] ❌ No push subscriptions found for user ${user.username}`);
+            console.log(`[PushService] ========================================`);
             return false;
         }
 
-        console.log(`[PushService] Attempting to send push notification to ${user.username} (${user.pushSubscriptions.length} subscription(s))`);
+        console.log(`[PushService] ✅ Found ${user.pushSubscriptions.length} subscription(s) for user ${user.username}`);
 
         const itemsList = expiringItems
             .map(item => item.name)
@@ -73,23 +85,37 @@ class PushService {
             }
         });
 
+        console.log(`[PushService] Notification payload:`, payload);
+
         let successCount = 0;
         const failedSubscriptions: string[] = [];
 
         // Send to all subscriptions
-        for (const subStr of user.pushSubscriptions) {
+        for (let i = 0; i < user.pushSubscriptions.length; i++) {
+            const subStr = user.pushSubscriptions[i];
+            console.log(`[PushService] Processing subscription ${i + 1}/${user.pushSubscriptions.length}`);
+            console.log(`[PushService] Subscription string length:`, subStr.length);
+
             try {
                 const sub = JSON.parse(subStr);
+                console.log(`[PushService] Parsed subscription endpoint:`, sub.endpoint?.substring(0, 80) + '...');
+                console.log(`[PushService] Sending notification...`);
+
                 await webpush.sendNotification(sub, payload);
                 successCount++;
-                console.log(`[PushService] ✅ Push sent successfully to subscription endpoint: ${sub.endpoint.substring(0, 50)}...`);
+                console.log(`[PushService] ✅ Push sent successfully to subscription ${i + 1}`);
             } catch (error: any) {
+                console.error(`[PushService] ❌ Error sending push to subscription ${i + 1}:`, error);
+                console.error(`[PushService] Error status code:`, error.statusCode);
+                console.error(`[PushService] Error message:`, error.message);
+                console.error(`[PushService] Error body:`, error.body);
+
                 if (error.statusCode === 410 || error.statusCode === 404) {
                     // Subscription has expired or is no longer valid
                     console.log(`[PushService] ⚠️ Subscription expired (${error.statusCode}), marking for cleanup`);
                     failedSubscriptions.push(subStr);
                 } else {
-                    console.error(`[PushService] ❌ Error sending push (${error.statusCode || 'unknown'}):`, error.message);
+                    console.error(`[PushService] ❌ Unexpected error (${error.statusCode || 'unknown'}):`, error.message);
                 }
             }
         }
@@ -102,10 +128,12 @@ class PushService {
 
         if (successCount > 0) {
             console.log(`[PushService] ✅ Successfully sent ${successCount}/${user.pushSubscriptions.length} push notifications to ${user.username}`);
+            console.log(`[PushService] ========================================`);
             return true;
         }
 
         console.log(`[PushService] ❌ Failed to send any push notifications to ${user.username}`);
+        console.log(`[PushService] ========================================`);
         return false;
     }
 }

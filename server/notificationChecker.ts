@@ -120,7 +120,16 @@ class NotificationChecker {
     const telegramEnabled = user.telegramNotifications === "true";
     const pushEnabled = user.browserNotifications === "true";
 
+    console.log(`[NotificationChecker] Notification channels for ${user.username}:`);
+    console.log(`[NotificationChecker]   Email: ${emailEnabled}`);
+    console.log(`[NotificationChecker]   WhatsApp: ${whatsappEnabled}`);
+    console.log(`[NotificationChecker]   SMS: ${smsEnabled}`);
+    console.log(`[NotificationChecker]   Telegram: ${telegramEnabled}`);
+    console.log(`[NotificationChecker]   Browser Push: ${pushEnabled}`);
+    console.log(`[NotificationChecker]   user.browserNotifications value: "${user.browserNotifications}"`);
+
     if (!emailEnabled && !whatsappEnabled && !smsEnabled && !telegramEnabled && !pushEnabled) {
+      console.log(`[NotificationChecker] No notification channels enabled for ${user.username}`);
       return null;
     }
 
@@ -157,31 +166,65 @@ class NotificationChecker {
 
     // Send email notification
     if (emailEnabled && emailService.isConfigured()) {
+      console.log(`[NotificationChecker] 📧 Attempting to send email notification...`);
       result.emailSent = await emailService.sendExpiryNotification(user, expiringItems);
+      console.log(`[NotificationChecker] Email result: ${result.emailSent ? '✅ Sent' : '❌ Failed'}`);
+    } else {
+      console.log(`[NotificationChecker] ⏭️ Skipping email (enabled: ${emailEnabled}, configured: ${emailService.isConfigured()})`);
     }
 
     // Send WhatsApp notification (try free Cloud API first, then Twilio)
     if (whatsappEnabled) {
+      console.log(`[NotificationChecker] 📱 Attempting to send WhatsApp notification...`);
+      console.log(`[NotificationChecker] User mobile: ${user.mobile}`);
+      
       if (whatsappCloudService.isConfigured()) {
+        console.log(`[NotificationChecker] Using WhatsApp Cloud API...`);
         result.whatsappSent = await whatsappCloudService.sendExpiryNotification(user, expiringItems);
       } else if (whatsappService.isConfigured()) {
+        console.log(`[NotificationChecker] Using Twilio WhatsApp...`);
         result.whatsappSent = await whatsappService.sendExpiryNotification(user, expiringItems);
+      } else {
+        console.log(`[NotificationChecker] ⚠️ WhatsApp enabled but no service configured`);
       }
+      console.log(`[NotificationChecker] WhatsApp result: ${result.whatsappSent ? '✅ Sent' : '❌ Failed'}`);
+      
+      if (!result.whatsappSent) {
+        console.log(`[NotificationChecker] 🔍 WhatsApp troubleshooting:`);
+        console.log(`[NotificationChecker]    - Check if user joined Twilio sandbox`);
+        console.log(`[NotificationChecker]    - Verify mobile number format: ${user.mobile}`);
+        console.log(`[NotificationChecker]    - Check server logs for detailed error`);
+      }
+    } else {
+      console.log(`[NotificationChecker] ⏭️ Skipping WhatsApp (not enabled for user)`);
+      console.log(`[NotificationChecker] 💡 Enable WhatsApp in Profile → Notification Settings`);
     }
 
     // Send SMS notification
     if (smsEnabled && smsService.isConfigured()) {
+      console.log(`[NotificationChecker] 📲 Attempting to send SMS notification...`);
       result.smsSent = await smsService.sendExpiryNotification(user, expiringItems);
+      console.log(`[NotificationChecker] SMS result: ${result.smsSent ? '✅ Sent' : '❌ Failed'}`);
+    } else {
+      console.log(`[NotificationChecker] ⏭️ Skipping SMS (enabled: ${smsEnabled}, configured: ${smsService.isConfigured()})`);
     }
 
     // Send Telegram notification
     if (telegramEnabled && telegramService.isConfigured()) {
+      console.log(`[NotificationChecker] 💬 Attempting to send Telegram notification...`);
       result.telegramSent = await telegramService.sendExpiryNotification(user, expiringItems);
+      console.log(`[NotificationChecker] Telegram result: ${result.telegramSent ? '✅ Sent' : '❌ Failed'}`);
+    } else {
+      console.log(`[NotificationChecker] ⏭️ Skipping Telegram (enabled: ${telegramEnabled}, configured: ${telegramService.isConfigured()})`);
     }
 
     // Send Push Notification
     if (pushEnabled && pushService.isConfigured()) {
+      console.log(`[NotificationChecker] 🔔 Attempting to send browser push notification...`);
       result.pushSent = await pushService.sendExpiryNotification(user, expiringItems);
+      console.log(`[NotificationChecker] Browser Push result: ${result.pushSent ? '✅ Sent' : '❌ Failed'}`);
+    } else {
+      console.log(`[NotificationChecker] ⏭️ Skipping browser push (enabled: ${pushEnabled}, configured: ${pushService.isConfigured()})`);
     }
 
     return result;

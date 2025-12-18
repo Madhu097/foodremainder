@@ -100,6 +100,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   };
 
   const subscribeToPush = async () => {
+    // Check browser support first
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       toast({
         title: "Not Supported",
@@ -109,33 +110,51 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
       return false;
     }
 
+    // Check if notifications are supported
+    if (!('Notification' in window)) {
+      toast({
+        title: "Not Supported",
+        description: "Notifications are not supported in this browser.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     try {
       setIsSubscribing(true);
       console.log("[Push] Starting push notification subscription...");
+      console.log(`[Push] Current permission: ${Notification.permission}`);
 
-      // Check current permission state
-      const currentPermission = Notification.permission;
-      console.log(`[Push] Current permission: ${currentPermission}`);
+      // Request notification permission IMMEDIATELY (must be synchronous with user gesture)
+      // This is critical - the permission request must happen in the same call stack as the user click
+      let permission = Notification.permission;
 
-      // Request notification permission first
-      const permission = await Notification.requestPermission();
-      console.log(`[Push] Permission result: ${permission}`);
+      if (permission === 'default') {
+        console.log("[Push] Requesting notification permission...");
+        permission = await Notification.requestPermission();
+        console.log(`[Push] Permission result after request: ${permission}`);
+      } else {
+        console.log(`[Push] Permission already set to: ${permission}`);
+      }
 
       if (permission !== 'granted') {
         toast({
           title: "Permission Denied",
-          description: "Please allow notifications in your browser settings to enable this feature.",
+          description: permission === 'denied'
+            ? "Notifications are blocked. Please enable them in your browser settings for this site."
+            : "Please allow notifications to enable this feature.",
           variant: "destructive"
         });
         return false;
       }
+
+      console.log("[Push] Permission granted, proceeding with service worker registration...");
 
       // Check if service worker is already registered
       let registration = await navigator.serviceWorker.getRegistration('/');
 
       if (!registration) {
         console.log("[Push] Registering service worker...");
-        // Register service worker
         registration = await navigator.serviceWorker.register('/sw.js', {
           scope: '/'
         });
@@ -191,7 +210,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
       console.log("[Push] Push subscription successful");
 
       // Send subscription to server
-      console.log("[Push] Sending subscription to server...");
+      console.log("[Push] Sending subscription to server for userId:", userId);
       const subscribeResponse = await fetch(`${API_BASE_URL}/api/notifications/subscribe`, {
         method: 'POST',
         body: JSON.stringify({ userId, subscription }),
@@ -226,12 +245,16 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   };
 
   const handlePushToggle = async (checked: boolean) => {
+    console.log("[NotificationSettings] handlePushToggle called with checked:", checked);
     if (checked) {
+      console.log("[NotificationSettings] Attempting to subscribe to push notifications...");
       const success = await subscribeToPush();
+      console.log("[NotificationSettings] subscribeToPush returned:", success);
       if (success) {
         setPreferences({ ...preferences, browserNotifications: true });
       }
     } else {
+      console.log("[NotificationSettings] Disabling browser notifications");
       setPreferences({ ...preferences, browserNotifications: false });
     }
   };
@@ -433,7 +456,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
                   Receive expiry alerts via WhatsApp
-                  {!preferences.servicesConfigured?.whatsapp && (
+                  {!(preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud) && (
                     <span className="block text-amber-600 dark:text-amber-500 mt-1">
                       ⚠️ WhatsApp service not configured on server
                     </span>

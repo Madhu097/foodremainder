@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Mail, Phone, Calendar, LogOut, ArrowLeft, KeyRound, Edit2, Check, X, Camera, Upload, Copy, CheckCircle2 } from "lucide-react";
+import { User, Mail, Phone, Calendar, LogOut, ArrowLeft, KeyRound, Edit2, Check, X, Camera, Upload, Copy, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChangePasswordModal } from "@/components/ChangePasswordModal";
 import { NotificationSettings } from "@/components/NotificationSettings";
@@ -20,6 +20,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Avatar options with Avengers theme
 const AVATARS = [
@@ -512,7 +523,10 @@ export default function ProfilePage() {
                       <Label className="text-sm font-medium">Mobile Number</Label>
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                         <Phone className="w-5 h-5 text-green-500" />
-                        <span className="font-medium">{currentUser.mobile}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{currentUser.mobile}</span>
+                          <span className="text-xs text-muted-foreground">Used for WhatsApp notifications</span>
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Contact support to change your mobile number
@@ -555,6 +569,65 @@ export default function ProfilePage() {
                 transition={{ duration: 0.4, delay: 0.2 }}
               >
                 <NotificationSettings userId={currentUser.id} />
+              </motion.div>
+
+              {/* Delete Account */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.3 }}
+                className="pt-6 border-t flex justify-center"
+              >
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Account
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete your account and all data including food items, notification preferences, and profile information. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(`${API_BASE_URL}/api/user/${currentUser.id}`, {
+                              method: 'DELETE',
+                              credentials: 'include',
+                            });
+
+                            if (response.ok) {
+                              toast({
+                                title: "Account Deleted",
+                                description: "Your account has been permanently deleted.",
+                              });
+                              setTimeout(() => {
+                                window.location.href = '/';
+                              }, 1500);
+                            } else {
+                              throw new Error('Failed to delete account');
+                            }
+                          } catch (error) {
+                            toast({
+                              title: "Error",
+                              description: "Failed to delete account. Please try again.",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Delete Account
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </motion.div>
             </div>
           </div>
