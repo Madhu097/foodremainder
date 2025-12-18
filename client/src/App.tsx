@@ -4,13 +4,23 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import HomePage from "@/pages/HomePage";
-import DashboardPage from "@/pages/DashboardPage";
-import AuthPage from "@/pages/AuthPage";
-import ProfilePage from "@/pages/ProfilePage";
-import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
-import HelpContactPage from "@/pages/HelpContactPage";
-import NotFound from "@/pages/not-found";
+import { lazy, Suspense } from "react";
+
+// Lazy load pages for better performance
+const HomePage = lazy(() => import("@/pages/HomePage"));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
+const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
+const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
+const HelpContactPage = lazy(() => import("@/pages/HelpContactPage"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+  </div>
+);
 
 function Router() {
   return (
@@ -31,7 +41,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <Router />
+          <Suspense fallback={<PageLoader />}>
+            <Router />
+          </Suspense>
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>

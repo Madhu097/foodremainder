@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Leaf, Menu, X, User, HelpCircle } from "lucide-react";
+import { Menu, X, User, HelpCircle } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -21,20 +21,21 @@ export function Navbar({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <motion.nav
-      className="sticky top-0 z-50 backdrop-blur-lg bg-background/90 border-b"
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="sticky top-0 z-50 backdrop-blur-lg bg-background/90 border-b">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
         <div className="flex justify-between items-center h-16 gap-4">
-          <Link href="/" className="flex items-center gap-2 hover-elevate active-elevate-2 px-2 py-1 rounded-md" data-testid="link-home">
+          <Link href="/" className="flex items-center gap-1.0 hover-elevate active-elevate-2 px-2 py-1 rounded-md" data-testid="link-home">
             <motion.div
               whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: 0.4, ease: "easeInOut" }}
             >
-              <Leaf className="h-6 w-6 text-primary" />
+              <img
+                src="/logo.png"
+                alt="Food Reminder Logo"
+                className="h-12 w-12"
+                loading="eager"
+                fetchPriority="high"
+              />
             </motion.div>
             <span className="text-xl font-bold">Food Reminder</span>
           </Link>
@@ -142,6 +143,6 @@ export function Navbar({
           )}
         </AnimatePresence>
       </div>
-    </motion.nav>
+    </nav>
   );
 }
