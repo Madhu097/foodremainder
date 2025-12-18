@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -54,6 +54,20 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [botUsername, setBotUsername] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  // Detect if browser supports push notifications
+  const isPushSupported = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    
+    // Check if iOS Safari (doesn't support push)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isIOSSafari = isIOS && !navigator.userAgent.includes('CriOS') && !navigator.userAgent.includes('FxiOS');
+    
+    if (isIOSSafari) return false;
+    
+    // Check browser support
+    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  }, []);
 
   useEffect(() => {
     fetchPreferences();
@@ -100,17 +114,38 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   };
 
   const subscribeToPush = async () => {
-    // Check browser support first
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    // Detect iOS Safari which doesn't support push notifications
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isIOSSafari = isIOS && !navigator.userAgent.includes('CriOS') && !navigator.userAgent.includes('FxiOS');
+    
+    if (isIOSSafari) {
       toast({
-        title: "Not Supported",
-        description: "Push notifications are not supported in this browser. Please use Chrome, Firefox, or Edge.",
+        title: "Not Available on iOS Safari",
+        description: "Push notifications are not supported on iOS Safari. Use email, WhatsApp, or Telegram notifications instead.",
         variant: "destructive"
       });
       return false;
     }
 
-    // Check if notifications are supported
+    // Check browser support
+    if (!('serviceWorker' in navigator)) {
+      toast({
+        title: "Not Supported",
+        description: "Service workers are not supported. Try using a modern browser like Chrome or Edge.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    if (!('PushManager' in window)) {
+      toast({
+        title: "Not Supported",
+        description: "Push notifications are not supported. Use email, WhatsApp, or Telegram instead.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     if (!('Notification' in window)) {
       toast({
         title: "Not Supported",
@@ -157,12 +192,24 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
         console.log("[Push] Registering service worker...");
         try {
           registration = await navigator.serviceWorker.register('/sw.js', {
-            scope: '/'
+            scope: '/',
+            updateViaCache: 'none'
           });
           console.log("[Push] Service worker registered successfully");
+          
+          // Wait a moment for service worker to activate
+          await new Promise(resolve => setTimeout(resolve, 500));
         } catch (swError: any) {
           console.error("[Push] Service worker registration failed:", swError);
-          throw new Error(`Service worker registration failed: ${swError.message}. This may not work on some mobile browsers.`);
+          
+          // Check if it's a network or security error
+          if (swError.message.includes('network') || swError.message.includes('NetworkError')) {
+            throw new Error('Network error. Please check your internet connection.');
+          } else if (swError.message.includes('secure') || swError.message.includes('HTTPS')) {
+            throw new Error('Push notifications require HTTPS. Not available in insecure contexts.');
+          } else {
+            throw new Error('Service worker registration failed. Push notifications may not be supported on this device.');
+          }
         }
       } else {
         console.log("[Push] Service worker already registered");
@@ -208,11 +255,23 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
 
       // Subscribe to push notifications
       console.log("[Push] Subscribing to push notifications...");
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: convertedVapidKey
-      });
-      console.log("[Push] Push subscription successful");
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedVapidKey
+        });
+        console.log("[Push] Push subscription successful");
+      } catch (subError: any) {
+        console.error("[Push] Push subscription failed:", subError);
+        
+        if (subError.message.includes('permission') || subError.name === 'NotAllowedError') {
+          throw new Error('Notification permission denied. Please enable notifications in your browser settings.');
+        } else if (subError.message.includes('network')) {
+          throw new Error('Network error during subscription. Please try again.');
+        } else {
+          throw new Error('Failed to subscribe to push notifications. This feature may not work on your device.');
+        }
+      }
 
       // Send subscription to server
       console.log("[Push] Sending subscription to server for userId:", userId);
@@ -412,35 +471,37 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             />
           </div>
 
-          {/* Browser Notifications */}
-          <div className="flex items-start justify-between space-x-4 p-4 rounded-lg bg-muted/50">
-            <div className="flex items-start space-x-3 flex-1">
-              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20 mt-1">
-                <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="browser-notifications" className="text-base font-semibold cursor-pointer">
-                    Browser Notifications
-                  </Label>
-                  {preferences.servicesConfigured?.push ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-amber-600" />
-                  )}
+          {/* Browser Notifications - Only show if supported */}
+          {isPushSupported && (
+            <div className="flex items-start justify-between space-x-4 p-4 rounded-lg bg-muted/50">
+              <div className="flex items-start space-x-3 flex-1">
+                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20 mt-1">
+                  <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Receive push notifications in your browser
-                </p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="browser-notifications" className="text-base font-semibold cursor-pointer">
+                      Browser Notifications
+                    </Label>
+                    {preferences.servicesConfigured?.push ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Receive push notifications in your browser
+                  </p>
+                </div>
               </div>
+              <Switch
+                id="browser-notifications"
+                checked={preferences.browserNotifications}
+                onCheckedChange={handlePushToggle}
+                disabled={isSubscribing}
+              />
             </div>
-            <Switch
-              id="browser-notifications"
-              checked={preferences.browserNotifications}
-              onCheckedChange={handlePushToggle}
-              disabled={isSubscribing}
-            />
-          </div>
+          )}
 
           {/* WhatsApp Notifications */}
           <div className="flex items-start justify-between space-x-4 p-4 rounded-lg bg-muted/50">
