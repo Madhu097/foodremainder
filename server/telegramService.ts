@@ -25,30 +25,47 @@ class TelegramService {
         };
 
         try {
-            // Enable polling to receive /start messages
+            // Create bot without polling first to validate token
             this.bot = new TelegramBot(botToken, { polling: false });
 
-            // Handle polling errors to prevent crash
-            this.bot.on('polling_error', (error) => {
-                if (error.message.includes('409 Conflict')) {
-                    console.error("[TelegramService] ⚠️ Conflict detected! Another instance is running. Polling stopped.");
-                    this.bot?.stopPolling();
-                } else {
-                    console.error(`[TelegramService] Polling error: ${error.message}`);
+            // Verify token is valid before starting polling
+            this.bot.getMe().then((me) => {
+                this.botUsername = me.username || null;
+                console.log(`[TelegramService] ✅ Bot token verified: @${me.username}`);
+                
+                // Token is valid, start polling
+                if (this.bot) {
+                    this.bot.startPolling({ restart: false });
+                    console.log(`[TelegramService] ✅ Started polling for updates`);
                 }
+            }).catch((err) => {
+                console.error("[TelegramService] ❌ Invalid bot token or connection failed:", err.message);
+                console.error("[TelegramService] 💡 Check your TELEGRAM_BOT_TOKEN in Render environment variables");
+                console.error("[TelegramService] 📖 Get a valid token from @BotFather on Telegram");
+                this.bot = null;
+                this.config = null;
+                return false;
             });
 
-            // Start polling safely
-            this.bot.startPolling();
-
-            // Handle polling errors to prevent crash
+            // Handle polling errors to prevent crash and stop on auth errors
             this.bot.on('polling_error', (error) => {
-                // Determine if it's a fatal error or just a temporary network/conflict issue
-                if (error.message.includes('409 Conflict')) {
-                    console.error("[TelegramService] ⚠️ Conflict detected! Another instance is running. Polling stopped.");
+                const errorMsg = error.message || '';
+                
+                // Stop polling on fatal errors
+                if (errorMsg.includes('409 Conflict')) {
+                    console.error("[TelegramService] ⚠️ Conflict detected! Another instance is running. Stopping polling.");
                     this.bot?.stopPolling();
+                } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+                    console.error("[TelegramService] ❌ 401 Unauthorized - Invalid bot token. Stopping polling.");
+                    console.error("[TelegramService] 💡 Fix: Check TELEGRAM_BOT_TOKEN in Render environment variables");
+                    this.bot?.stopPolling();
+                    this.bot = null;
+                } else if (errorMsg.includes('404') || errorMsg.includes('Not Found')) {
+                    console.error("[TelegramService] ❌ Bot not found. Token may be revoked. Stopping polling.");
+                    this.bot?.stopPolling();
+                    this.bot = null;
                 } else {
-                    console.error(`[TelegramService] Polling error: ${error.message}`);
+                    console.warn(`[TelegramService] Polling error: ${errorMsg}`);
                 }
             });
 
@@ -78,14 +95,6 @@ class TelegramService {
                         this.bot?.sendMessage(chatId, "❌ An error occurred while linking your account.");
                     }
                 }
-            });
-
-            // Get bot info
-            this.bot.getMe().then((me) => {
-                this.botUsername = me.username || null;
-                console.log(`[TelegramService] ✅ Telegram service initialized as @${me.username}`);
-            }).catch((err) => {
-                console.error("[TelegramService] ❌ Failed to connect to Telegram:", err.message);
             });
 
             return true;
