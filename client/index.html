@@ -7,140 +7,17 @@
   <title>Food Reminder - Never Let Food Go to Waste</title>
   <meta name="description"
     content="Track your food expiry dates and reduce waste with Food Reminder. Get alerts when food is expiring soon and manage your kitchen inventory effortlessly." />
-
-  <!-- Favicons -->
   <link rel="icon" type="image/png" sizes="32x32" href="/logo.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/logo.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
-
-  <!-- Preload critical resources -->
-  <link rel="preload" href="/logo.png" as="image" fetchpriority="high" />
-
-  <!-- DNS Prefetch for external resources -->
-  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
-
-  <!-- Preconnect to font providers -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-  <!-- Optimized font loading with display=swap for better performance -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Inline critical CSS for loading screen -->
-  <style>
-    #app-loader {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      z-index: 9999;
-      transition: opacity 0.3s ease-out;
-    }
-
-    #app-loader.loaded {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .loader-content {
-      text-align: center;
-      animation: fadeInUp 0.6s ease-out;
-    }
-
-    .loader-logo {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 20px;
-      animation: bounce 1s ease-in-out infinite;
-    }
-
-    .loader-spinner {
-      width: 48px;
-      height: 48px;
-      margin: 20px auto;
-      border: 4px solid rgba(34, 197, 94, 0.2);
-      border-top-color: #22c55e;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .loader-text {
-      color: #374151;
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      font-size: 16px;
-      font-weight: 500;
-      margin-top: 12px;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    @keyframes bounce {
-
-      0%,
-      100% {
-        transform: translateY(0);
-      }
-
-      50% {
-        transform: translateY(-10px);
-      }
-    }
-
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @media (prefers-color-scheme: dark) {
-      #app-loader {
-        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-      }
-
-      .loader-text {
-        color: #e5e7eb;
-      }
-    }
-  </style>
 </head>
 
 <body>
-  <!-- Inline loading screen for instant feedback -->
-  <div id="app-loader">
-    <div class="loader-content">
-      <img src="/logo.png" alt="Food Reminder" class="loader-logo" />
-      <div class="loader-spinner"></div>
-      <div class="loader-text">Loading Food Reminder...</div>
-    </div>
-  </div>
-
   <div id="root"></div>
-
   <script type="module" src="/src/main.tsx"></script>
-
-  <!-- Remove loader when app is ready -->
-  <script>
-    window.addEventListener('load', () => {
-      const loader = document.getElementById('app-loader');
-      if (loader) {
-        loader.classList.add('loaded');
-        setTimeout(() => loader.remove(), 300);
-      }
-    });
-  </script>
 </body>
 
-</html>
+</html> 
