@@ -69,6 +69,13 @@ class WhatsAppService {
       return false;
     }
 
+    // Check if user has mobile number
+    if (!user.mobile || user.mobile.trim() === '') {
+      console.warn(`[WhatsAppService] ⚠️ User ${user.username} has no mobile number. Skipping WhatsApp notification.`);
+      console.log(`[WhatsAppService] 💡 Add mobile number in Profile settings to receive WhatsApp notifications`);
+      return false;
+    }
+
     try {
       const itemsList = expiringItems
         .map((item) => {
@@ -94,7 +101,10 @@ View your dashboard: ${process.env.APP_URL || "http://localhost:5000"}/dashboard
 
       // Format mobile number for WhatsApp
       // Twilio WhatsApp expects format: whatsapp:+1234567890
-      let toNumber = user.mobile;
+      let toNumber = user.mobile.trim();
+      
+      // Remove any non-digit characters except +
+      toNumber = toNumber.replace(/[^\d+]/g, '');
 
       if (!toNumber.startsWith("+")) {
         // If mobile doesn't have country code, add +91 (India) as default
