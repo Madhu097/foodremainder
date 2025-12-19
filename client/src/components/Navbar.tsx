@@ -24,7 +24,7 @@ export function Navbar({
     <nav className="sticky top-0 z-50 backdrop-blur-lg bg-background/90 border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
         <div className="flex justify-between items-center h-16 gap-4">
-          <Link href="/" className="flex items-center gap-1.0 hover-elevate active-elevate-2 px-2 py-1 rounded-md" data-testid="link-home">
+          <Link href="/" className="flex items-center gap-0 hover-elevate active-elevate-2 px-2 py-1 rounded-md" data-testid="link-home">
             <motion.div
               whileHover={{ rotate: 360 }}
               transition={{ duration: 0.4, ease: "easeInOut" }}
@@ -32,7 +32,7 @@ export function Navbar({
               <img
                 src="/logo.png"
                 alt="Food Reminder Logo"
-                className="h-12 w-12"
+                className="h-12 w-12 object-contain"
                 loading="eager"
                 fetchPriority="high"
               />
