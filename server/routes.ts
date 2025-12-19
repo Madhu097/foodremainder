@@ -122,7 +122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Normalize identifier: if it's a mobile number without country code, add +91
       let identifier = validatedData.identifier.trim();
-      
+
       // Check if identifier looks like a mobile number (only digits, possibly with +)
       const isMobileNumber = /^[+]?[0-9]{10,15}$/.test(identifier);
       if (isMobileNumber && !identifier.startsWith('+')) {
@@ -415,11 +415,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/notifications/preferences/:userId", async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
+      console.log(`[Notifications] Fetching preferences for user: ${userId}`);
       const user = await storage.getUser(userId);
 
       if (!user) {
+        console.error(`[Notifications] ❌ User not found in database: ${userId}`);
         return res.status(404).json({ message: "User not found" });
       }
+
+      console.log(`[Notifications] ✅ User found: ${user.username}`);
 
       res.status(200).json({
         emailNotifications: user.emailNotifications === "true",
@@ -525,20 +529,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       console.log(`[User] Delete account request for user: ${userId}`);
-      
+
       // Delete user's food items first
       const foodItems = await storage.getFoodItemsByUserId(userId);
       for (const item of foodItems) {
         await storage.deleteFoodItem(item.id, userId);
       }
       console.log(`[User] Deleted ${foodItems.length} food items`);
-      
+
       // Delete user
       const deleted = await storage.deleteUser(userId);
       if (!deleted) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       console.log(`[User] ✅ Account deleted successfully: ${userId}`);
       res.status(200).json({ message: "Account deleted successfully" });
     } catch (error) {

@@ -54,17 +54,17 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [botUsername, setBotUsername] = useState<string | null>(null);
   const { toast } = useToast();
-  
+
   // Detect if browser supports push notifications
   const isPushSupported = React.useMemo(() => {
     if (typeof window === 'undefined') return false;
-    
+
     // Check if iOS Safari (doesn't support push)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     const isIOSSafari = isIOS && !navigator.userAgent.includes('CriOS') && !navigator.userAgent.includes('FxiOS');
-    
+
     if (isIOSSafari) return false;
-    
+
     // Check browser support
     return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   }, []);
@@ -92,9 +92,22 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
       const response = await fetch(`${API_BASE_URL}/api/notifications/preferences/${userId}`, {
         credentials: "include",
       });
+
+      if (response.status === 404) {
+        // User not found in database - likely stale localStorage data
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired or your account was not found. Please log out and log back in.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Failed to fetch preferences");
       }
+
       const data = await response.json();
       setPreferences({
         ...data,
@@ -117,7 +130,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
     // Detect iOS Safari which doesn't support push notifications
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     const isIOSSafari = isIOS && !navigator.userAgent.includes('CriOS') && !navigator.userAgent.includes('FxiOS');
-    
+
     if (isIOSSafari) {
       toast({
         title: "Not Available on iOS Safari",
@@ -196,12 +209,12 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             updateViaCache: 'none'
           });
           console.log("[Push] Service worker registered successfully");
-          
+
           // Wait a moment for service worker to activate
           await new Promise(resolve => setTimeout(resolve, 500));
         } catch (swError: any) {
           console.error("[Push] Service worker registration failed:", swError);
-          
+
           // Check if it's a network or security error
           if (swError.message.includes('network') || swError.message.includes('NetworkError')) {
             throw new Error('Network error. Please check your internet connection.');
@@ -263,7 +276,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
         console.log("[Push] Push subscription successful");
       } catch (subError: any) {
         console.error("[Push] Push subscription failed:", subError);
-        
+
         if (subError.message.includes('permission') || subError.name === 'NotAllowedError') {
           throw new Error('Notification permission denied. Please enable notifications in your browser settings.');
         } else if (subError.message.includes('network')) {

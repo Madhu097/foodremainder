@@ -17,6 +17,7 @@ export interface IStorage {
   updateUserProfile(userId: string, profile: { username?: string; email?: string; profilePicture?: string }): Promise<boolean>;
   updateNotificationPreferences(userId: string, preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>): Promise<boolean>;
   addPushSubscription(userId: string, subscription: string): Promise<boolean>;
+  deleteUser(userId: string): Promise<boolean>;
 
   // Food item methods
   getFoodItemsByUserId(userId: string): Promise<FoodItem[]>;
@@ -76,6 +77,7 @@ export class MemStorage implements IStorage {
       id,
       emailNotifications: "true",
       whatsappNotifications: "false",
+      smsNotifications: "false",
       telegramNotifications: "false",
       telegramChatId: null,
       notificationDays: "3",
@@ -143,6 +145,10 @@ export class MemStorage implements IStorage {
 
     this.users.set(userId, user);
     return true;
+  }
+
+  async deleteUser(userId: string): Promise<boolean> {
+    return this.users.delete(userId);
   }
 
   // Food item methods
