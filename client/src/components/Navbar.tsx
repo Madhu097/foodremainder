@@ -52,17 +52,30 @@ export function Navbar({
                 </Link>
               </>
             )}
-            <Link href="/help-contact" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md flex items-center gap-2" data-testid="link-help">
-              <HelpCircle className="w-4 h-4" />
-              Help
-            </Link>
           </div>
 
           <div className="hidden md:flex items-center gap-3">
             {!isAuthenticated && (
-              <Link href="#about" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md" data-testid="link-about">
-                About
-              </Link>
+              <>
+                <Link
+                  href="/"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.location.href = "/";
+                    setTimeout(() => {
+                      document.getElementById("about")?.scrollIntoView({ behavior: "smooth" });
+                    }, 100);
+                  }}
+                  className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md"
+                  data-testid="link-about"
+                >
+                  About
+                </Link>
+                <Link href="/help-contact" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md flex items-center gap-2" data-testid="link-help">
+                  <HelpCircle className="w-4 h-4" />
+                  Help
+                </Link>
+              </>
             )}
             <ThemeToggle />
             {!isAuthenticated ? (
@@ -103,11 +116,6 @@ export function Navbar({
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
             >
-              {!isAuthenticated && (
-                <Link href="#about" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-about-mobile">
-                  About
-                </Link>
-              )}
               {isAuthenticated && (
                 <>
                   <Link href="/dashboard" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-dashboard-mobile">
@@ -119,10 +127,29 @@ export function Navbar({
                   </Link>
                 </>
               )}
-              <Link href="/help-contact" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2 flex items-center gap-2" data-testid="link-help-mobile">
-                <HelpCircle className="w-4 h-4" />
-                Help & Contact
-              </Link>
+              {!isAuthenticated && (
+                <>
+                  <Link
+                    href="/"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setMobileMenuOpen(false);
+                      window.location.href = "/";
+                      setTimeout(() => {
+                        document.getElementById("about")?.scrollIntoView({ behavior: "smooth" });
+                      }, 100);
+                    }}
+                    className="block px-3 py-2 rounded-md hover-elevate active-elevate-2"
+                    data-testid="link-about-mobile"
+                  >
+                    About
+                  </Link>
+                  <Link href="/help-contact" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2 flex items-center gap-2" data-testid="link-help-mobile">
+                    <HelpCircle className="w-4 h-4" />
+                    Help & Contact
+                  </Link>
+                </>
+              )}
               <div className="pt-2 space-y-2">
                 {!isAuthenticated ? (
                   <>

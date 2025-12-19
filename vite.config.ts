@@ -33,10 +33,22 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
+          // Separate vendor chunks for better caching
           'react-vendor': ['react', 'react-dom', 'wouter'],
           'ui-vendor': ['framer-motion', 'lucide-react'],
           'query-vendor': ['@tanstack/react-query'],
+          'radix-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-select',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-tooltip',
+          ],
         },
+        // Optimize chunk file names for better caching
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
       },
     },
     chunkSizeWarningLimit: 1000,
@@ -45,9 +57,23 @@ export default defineConfig({
       compress: {
         drop_console: true,
         drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+        passes: 2,
+      },
+      mangle: {
+        safari10: true,
+      },
+      format: {
+        comments: false,
       },
     },
     cssMinify: true,
+    // Enable source maps for production debugging (optional, can be disabled)
+    sourcemap: false,
+    // Optimize asset inlining
+    assetsInlineLimit: 4096,
+    // Enable CSS code splitting
+    cssCodeSplit: true,
   },
   server: {
     fs: {

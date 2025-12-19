@@ -15,10 +15,20 @@ const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
 const HelpContactPage = lazy(() => import("@/pages/HelpContactPage"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
-// Loading fallback component
+// Loading fallback component with better UX
 const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+  <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted">
+    <div className="text-center space-y-4">
+      <div className="relative">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary mx-auto"></div>
+        <img
+          src="/logo.png"
+          alt="Loading"
+          className="absolute inset-0 m-auto h-8 w-8 object-contain animate-pulse"
+        />
+      </div>
+      <p className="text-sm text-muted-foreground animate-pulse">Loading...</p>
+    </div>
   </div>
 );
 
