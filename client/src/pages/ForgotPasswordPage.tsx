@@ -115,7 +115,13 @@ export default function ForgotPasswordPage() {
                 {step === "identify" ? (
                   <KeyRound className="w-8 h-8 text-green-600 dark:text-green-400" />
                 ) : (
-                  <Leaf className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  <img
+                    src="/logo.png"
+                    alt="Food Reminder Logo"
+                    className="w-8 h-8 object-contain"
+                    loading="eager"
+                    fetchPriority="high"
+                  />
                 )}
               </div>
             </div>

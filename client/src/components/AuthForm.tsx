@@ -29,7 +29,7 @@ interface AuthFormProps {
 
 export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: AuthFormProps) {
   const [formData, setFormData] = useState<RegisterFormData | LoginFormData>(
-    mode === "register" 
+    mode === "register"
       ? { username: "", email: "", mobile: "", password: "" }
       : { identifier: "", password: "" }
   );
@@ -38,7 +38,7 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
   // Reset form data when mode changes
   useEffect(() => {
     setFormData(
-      mode === "register" 
+      mode === "register"
         ? { username: "", email: "", mobile: "", password: "" }
         : { identifier: "", password: "" }
     );
@@ -47,7 +47,7 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-    
+
     if (mode === "register") {
       const data = formData as RegisterFormData;
       if (!data.username || data.username.length < 3) {
@@ -71,14 +71,14 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
         errors.password = "Password is required";
       }
     }
-    
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (validateForm()) {
       onSubmit?.(formData);
     }
@@ -98,12 +98,12 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
       {/* Subtle gradient orbs - optimized and softer */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 -left-20 w-96 h-96 bg-gradient-to-br from-green-400/8 to-emerald-400/5 rounded-full blur-3xl will-change-transform" 
-             style={{ animation: 'float 15s ease-in-out infinite' }} />
-        <div className="absolute bottom-20 -right-20 w-96 h-96 bg-gradient-to-tl from-lime-400/8 to-green-400/5 rounded-full blur-3xl will-change-transform" 
-             style={{ animation: 'float 18s ease-in-out infinite reverse' }} />
+        <div className="absolute top-20 -left-20 w-96 h-96 bg-gradient-to-br from-green-400/8 to-emerald-400/5 rounded-full blur-3xl will-change-transform"
+          style={{ animation: 'float 15s ease-in-out infinite' }} />
+        <div className="absolute bottom-20 -right-20 w-96 h-96 bg-gradient-to-tl from-lime-400/8 to-green-400/5 rounded-full blur-3xl will-change-transform"
+          style={{ animation: 'float 18s ease-in-out infinite reverse' }} />
       </div>
-      
+
       {/* Floating food icons */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {foodIcons.map((item, i) => (
@@ -139,7 +139,7 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
       >
         {/* Subtle glow effect */}
         <div className="absolute -inset-4 bg-gradient-to-r from-green-500/5 to-emerald-500/5 blur-2xl rounded-3xl" />
-        
+
         <Card className="backdrop-blur-md bg-card/98 shadow-xl border border-green-200/50 dark:border-green-800/30 relative">
           <CardHeader className="space-y-4">
             <motion.div
@@ -149,7 +149,13 @@ export function AuthForm({ mode, onSubmit, onToggleMode, error, isLoading }: Aut
               transition={{ duration: 0.3, delay: 0.1 }}
             >
               <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-green-100 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/20 rounded-2xl shadow-sm">
-                <Leaf className="h-8 w-8 text-green-600 dark:text-green-400" />
+                <img
+                  src="/logo.png"
+                  alt="Food Reminder Logo"
+                  className="h-16 w-16 object-contain"
+                  loading="eager"
+                  fetchPriority="high"
+                />
                 <span className="text-2xl font-bold bg-gradient-to-r from-green-700 to-emerald-600 dark:from-green-400 dark:to-emerald-400 bg-clip-text text-transparent">Food Reminder</span>
               </div>
             </motion.div>
