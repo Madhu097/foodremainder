@@ -111,8 +111,16 @@ class EmailService {
       return false;
     }
 
-    if (!user.email) {
+    if (!user.email || user.email.trim() === '') {
       console.warn(`[EmailService] ⚠️ User ${user.username} has no email address`);
+      console.log(`[EmailService] 💡 Add email in Profile settings to receive email notifications`);
+      return false;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(user.email)) {
+      console.warn(`[EmailService] ⚠️ User ${user.username} has invalid email format: ${user.email}`);
       return false;
     }
 
@@ -128,6 +136,10 @@ class EmailService {
         if (this.config!.service === "resend" && this.resendClient) {
           // Send via Resend
           console.log(`[EmailService] Sending via Resend (attempt ${attempt}/${maxRetries})...`);
+          console.log(`[EmailService] From: ${this.config!.from}`);
+          console.log(`[EmailService] To: ${user.email}`);
+          console.log(`[EmailService] Subject: ${subject}`);
+          
           const { data, error } = await this.resendClient.emails.send({
             from: this.config!.from,
             to: user.email,
@@ -137,8 +149,18 @@ class EmailService {
           });
 
           if (error) {
-            console.error(`[EmailService] ❌ Resend API Error (attempt ${attempt}/${maxRetries}):`, JSON.stringify(error, null, 2));
+            console.error(`[EmailService] ❌ Resend API Error (attempt ${attempt}/${maxRetries}):`);
+            console.error(`[EmailService] Error name: ${error.name}`);
+            console.error(`[EmailService] Error message: ${error.message}`);
+            console.error(`[EmailService] Full error:`, JSON.stringify(error, null, 2));
             lastError = new Error(`Resend Error: ${error.message}`);
+
+            // Check for specific error types
+            if (error.message?.includes('API key')) {
+              console.error(`[EmailService] ❌ Invalid API key - check RESEND_API_KEY in .env`);
+              console.error(`[EmailService] Get your API key from: https://resend.com/api-keys`);
+              break;
+            }
 
             // Don't retry on certain errors
             if (error.message?.includes('Invalid') || error.message?.includes('not found')) {
