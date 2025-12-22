@@ -35,6 +35,264 @@ interface NotificationSettingsProps {
   userId: string;
 }
 
+// WhatsApp Verification Component
+function WhatsAppVerification({ userId }: { userId: string }) {
+  const [isVerified, setIsVerified] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isRequestingCode, setIsRequestingCode] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [whatsappCloudConfigured, setWhatsappCloudConfigured] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    checkVerificationStatus();
+    checkWhatsAppConfig();
+  }, [userId]);
+
+  const checkWhatsAppConfig = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/health`);
+      if (response.ok) {
+        const data = await response.json();
+        setWhatsappCloudConfigured(data.services?.whatsappCloud || false);
+      }
+    } catch (error) {
+      console.error("Error checking WhatsApp config:", error);
+    }
+  };
+
+  const checkVerificationStatus = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/whatsapp/status/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setIsVerified(data.isVerified);
+      }
+    } catch (error) {
+      console.error("Error checking WhatsApp verification status:", error);
+    }
+  };
+
+  const handleRequestCode = async () => {
+    setIsRequestingCode(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/whatsapp/request-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Code Sent!",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Failed to Send Code",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to request verification code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRequestingCode(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode.trim()) {
+      toast({
+        title: "Invalid Code",
+        description: "Please enter the verification code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/whatsapp/verify-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, code: verificationCode }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Success!",
+          description: result.message,
+        });
+        setIsVerified(true);
+        setVerificationCode("");
+      } else {
+        toast({
+          title: "Verification Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to verify code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/whatsapp/disconnect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Disconnected",
+          description: result.message,
+        });
+        setIsVerified(false);
+      } else {
+        toast({
+          title: "Failed to Disconnect",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to disconnect WhatsApp",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  // If WhatsApp Cloud API is not configured, show simple info message
+  if (!whatsappCloudConfigured) {
+    return (
+      <div className="pl-12 space-y-3">
+        <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-md">
+          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+            WhatsApp notifications are ready! No verification needed.
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          💡 You'll receive WhatsApp notifications on your registered mobile number when items are expiring.
+        </p>
+      </div>
+    );
+  }
+
+  // Show verification UI if WhatsApp Cloud API is configured
+  return (
+    <div className="pl-12 space-y-3">
+      {isVerified ? (
+        <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-md">
+          <CheckCircle2 className="w-4 h-4 text-green-600" />
+          <span className="text-sm font-medium text-green-700 dark:text-green-300">
+            WhatsApp Connected!
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-xs h-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+            onClick={handleDisconnect}
+            disabled={isDisconnecting}
+          >
+            {isDisconnecting ? "Disconnecting..." : "Disconnect"}
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Verify your WhatsApp number to receive notifications.
+          </p>
+
+          <div className="flex gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              className="bg-green-600 hover:bg-green-700"
+              onClick={handleRequestCode}
+              disabled={isRequestingCode}
+            >
+              {isRequestingCode ? (
+                <>
+                  <BouncingFoodLoader size="sm" className="mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Request Code
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp-code" className="text-xs">
+              Enter Verification Code
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="whatsapp-code"
+                type="text"
+                placeholder="Enter 6-digit code"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                maxLength={6}
+                className="flex-1"
+              />
+              <Button
+                size="sm"
+                onClick={handleVerifyCode}
+                disabled={isVerifying || verificationCode.length !== 6}
+              >
+                {isVerifying ? (
+                  <>
+                    <BouncingFoodLoader size="sm" className="mr-2" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Verify"
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Click "Request Code" to receive a 6-digit verification code on your WhatsApp. Enter the code above to verify.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     emailNotifications: true,
@@ -517,40 +775,47 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
           )}
 
           {/* WhatsApp Notifications */}
-          <div className="flex items-start justify-between space-x-4 p-4 rounded-lg bg-muted/50">
-            <div className="flex items-start space-x-3 flex-1">
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20 mt-1">
-                <MessageCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="whatsapp-notifications" className="text-base font-semibold cursor-pointer">
-                    WhatsApp Notifications
-                  </Label>
-                  {preferences.servicesConfigured?.whatsapp ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-amber-600" />
-                  )}
+          <div className="flex flex-col space-y-4 p-4 rounded-lg bg-muted/50">
+            <div className="flex items-start justify-between space-x-4">
+              <div className="flex items-start space-x-3 flex-1">
+                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20 mt-1">
+                  <MessageCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Receive expiry alerts via WhatsApp
-                  {!(preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud) && (
-                    <span className="block text-amber-600 dark:text-amber-500 mt-1">
-                      ⚠️ WhatsApp service not configured on server
-                    </span>
-                  )}
-                </p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="whatsapp-notifications" className="text-base font-semibold cursor-pointer">
+                      WhatsApp Notifications
+                    </Label>
+                    {preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Receive expiry alerts via WhatsApp
+                    {!(preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud) && (
+                      <span className="block text-amber-600 dark:text-amber-500 mt-1">
+                        ⚠️ WhatsApp service not configured on server
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
+              <Switch
+                id="whatsapp-notifications"
+                checked={preferences.whatsappNotifications}
+                onCheckedChange={(checked) =>
+                  setPreferences({ ...preferences, whatsappNotifications: checked })
+                }
+                disabled={!(preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud)}
+              />
             </div>
-            <Switch
-              id="whatsapp-notifications"
-              checked={preferences.whatsappNotifications}
-              onCheckedChange={(checked) =>
-                setPreferences({ ...preferences, whatsappNotifications: checked })
-              }
-              disabled={!(preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud)}
-            />
+
+            {/* WhatsApp Verification Section */}
+            {preferences.whatsappNotifications && (preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud) && (
+              <WhatsAppVerification userId={userId} />
+            )}
           </div>
 
           {/* SMS Notifications */}

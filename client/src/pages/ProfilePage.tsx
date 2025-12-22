@@ -255,7 +255,7 @@ export default function ProfilePage() {
 
     // Safety check
     if (!profilePic) {
-      return "/avatars/default.svg";
+      return "/avatars/default.png";
     }
 
     // Check if it's a base64 image (custom upload)
@@ -263,14 +263,14 @@ export default function ProfilePage() {
       return profilePic;
     }
 
-    // Check if it's a valid preset ID
+    // Check if it's a valid preset ID - use PNG format
     const isPreset = AVATARS.some(a => a.id === profilePic);
     if (isPreset) {
-      return `/avatars/${profilePic}.svg`;
+      return `/avatars/${profilePic}.png`;
     }
 
     // Default fallback
-    return "/avatars/default.svg";
+    return "/avatars/default.png";
   };
 
   const getUserDisplayId = () => {
@@ -354,9 +354,9 @@ export default function ProfilePage() {
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            // Prevent infinite loop by checking if we're already trying to load the default
-                            if (!target.src.includes('default.svg')) {
-                              target.src = '/avatars/default.svg';
+                            // Fallback to default PNG if image fails to load
+                            if (!target.src.includes('default.png')) {
+                              target.src = '/avatars/default.png';
                             }
                           }}
                         />
@@ -606,12 +606,12 @@ export default function ProfilePage() {
                               // Clear localStorage and session
                               localStorage.removeItem('user');
                               localStorage.clear();
-                              
+
                               toast({
                                 title: "Account Deleted",
                                 description: "Your account has been permanently deleted.",
                               });
-                              
+
                               // Redirect after a brief delay
                               setTimeout(() => {
                                 window.location.href = '/';
@@ -652,89 +652,90 @@ export default function ProfilePage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-6 py-4">
-            {/* Custom Upload Section */}
-            <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-6 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/50 transition-colors">
-              <div className="flex flex-col items-center gap-3">
-                <div className="bg-primary/10 p-4 rounded-full">
-                  <Upload className="w-8 h-8 text-primary" />
-                </div>
-                <div className="text-center space-y-1">
-                  <h3 className="font-semibold text-foreground">Upload Custom Photo</h3>
-                  <p className="text-xs text-muted-foreground">Supports PNG, JPG (max 5MB)</p>
-                </div>
+          <div className="max-h-[60vh] overflow-y-auto py-4">
+            <div className="grid gap-6">
+              {/* Custom Upload Section */}
+              <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-6 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/50 transition-colors">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-primary/10 p-4 rounded-full">
+                    <Upload className="w-8 h-8 text-primary" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <h3 className="font-semibold text-foreground">Upload Custom Photo</h3>
+                    <p className="text-xs text-muted-foreground">Supports PNG, JPG (max 5MB)</p>
+                  </div>
 
 
-                {/* Mobile-Friendly File Input */}
-                <label
-                  htmlFor="profile-upload-input"
-                  className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 py-2 mt-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ pointerEvents: uploadingImage ? 'none' : 'auto' }}
-                >
-                  {uploadingImage ? (
-                    <>
-                      <BouncingFoodLoader size="sm" />
-                      <span>Uploading...</span>
-                    </>
-                  ) : (
-                    <span>Choose from Device</span>
-                  )}
-                </label>
-                <input
-                  id="profile-upload-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCustomImageUpload}
-                  disabled={uploadingImage}
-                  className="hidden"
-                  aria-label="Upload profile picture"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground font-medium">Or Select Avatar</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4">
-                {AVATARS.map((avatar) => (
-                  <button
-                    key={avatar.id}
-                    onClick={() => handleAvatarSelect(avatar.id)}
-                    className={`group relative flex flex-col items-center gap-2 p-2 rounded-xl transition-all duration-200 ${currentUser.profilePicture === avatar.id
-                      ? "ring-2 ring-primary bg-primary/5 scale-105"
-                      : "hover:bg-slate-100 dark:hover:bg-slate-800 hover:scale-105"
-                      }`}
+                  {/* Mobile-Friendly File Input */}
+                  <label
+                    className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 py-2 mt-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ pointerEvents: uploadingImage ? 'none' : 'auto', opacity: uploadingImage ? 0.5 : 1 }}
                   >
-                    <div className="relative w-14 h-14 rounded-full overflow-hidden shadow-sm bg-white ring-1 ring-slate-100 dark:ring-slate-800">
-                      <img
-                        src={`/avatars/${avatar.id}.svg`}
-                        alt={avatar.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (!target.src.includes('default.svg')) {
-                            target.src = '/avatars/default.svg';
-                          }
-                        }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-medium text-center truncate w-full px-1">
-                      {avatar.name}
-                    </span>
-                    {currentUser.profilePicture === avatar.id && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-sm z-10">
-                        <Check className="w-3 h-3 text-primary-foreground" />
-                      </div>
+                    {uploadingImage ? (
+                      <>
+                        <BouncingFoodLoader size="sm" />
+                        <span>Uploading...</span>
+                      </>
+                    ) : (
+                      <span>Choose from Device</span>
                     )}
-                  </button>
-                ))}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCustomImageUpload}
+                      disabled={uploadingImage}
+                      className="hidden"
+                      aria-label="Upload profile picture"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground font-medium">Or Select Avatar</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4">
+                  {AVATARS.map((avatar) => (
+                    <button
+                      key={avatar.id}
+                      onClick={() => handleAvatarSelect(avatar.id)}
+                      className={`group relative flex flex-col items-center gap-2 p-2 rounded-xl transition-all duration-200 ${currentUser.profilePicture === avatar.id
+                        ? "ring-2 ring-primary bg-primary/5 scale-105"
+                        : "hover:bg-slate-100 dark:hover:bg-slate-800 hover:scale-105"
+                        }`}
+                    >
+                      <div className="relative w-14 h-14 rounded-full overflow-hidden shadow-sm bg-white ring-1 ring-slate-100 dark:ring-slate-800">
+                        <img
+                          src={`/avatars/${avatar.id}.png`}
+                          alt={avatar.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            // Fallback to default PNG if image fails to load
+                            if (!target.src.includes('default.png')) {
+                              target.src = '/avatars/default.png';
+                            }
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-medium text-center truncate w-full px-1">
+                        {avatar.name}
+                      </span>
+                      {currentUser.profilePicture === avatar.id && (
+                        <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-sm z-10">
+                          <Check className="w-3 h-3 text-primary-foreground" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

@@ -35,7 +35,7 @@ class Cache<T> {
     }
 
     invalidatePattern(pattern: string): void {
-        for (const key of this.cache.keys()) {
+        for (const key of Array.from(this.cache.keys())) {
             if (key.includes(pattern)) {
                 this.cache.delete(key);
             }
@@ -93,6 +93,24 @@ export class FirebaseStorage implements IStorage {
         console.log(`[FirebaseStorage] 💾 Fetching all users from database`);
         const snapshot = await db.collection('users').get();
         const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+
+        console.log(`[FirebaseStorage] ✅ Retrieved ${users.length} users from database`);
+
+        // Log notification preferences summary
+        const notificationStats = {
+            email: users.filter(u => u.emailNotifications === "true").length,
+            whatsapp: users.filter(u => u.whatsappNotifications === "true").length,
+            sms: users.filter(u => u.smsNotifications === "true").length,
+            telegram: users.filter(u => u.telegramNotifications === "true").length,
+            browser: users.filter(u => u.browserNotifications === "true").length,
+        };
+
+        console.log(`[FirebaseStorage] 📊 Notification preferences summary:`);
+        console.log(`[FirebaseStorage]    Email enabled: ${notificationStats.email}/${users.length}`);
+        console.log(`[FirebaseStorage]    WhatsApp enabled: ${notificationStats.whatsapp}/${users.length}`);
+        console.log(`[FirebaseStorage]    SMS enabled: ${notificationStats.sms}/${users.length}`);
+        console.log(`[FirebaseStorage]    Telegram enabled: ${notificationStats.telegram}/${users.length}`);
+        console.log(`[FirebaseStorage]    Browser enabled: ${notificationStats.browser}/${users.length}`);
 
         this.allUsersCache.set('all', users);
         return users;

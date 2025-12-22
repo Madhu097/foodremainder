@@ -68,7 +68,7 @@ class WhatsAppCloudService {
 
     try {
       const url = `${this.apiUrl}/${this.config!.phoneNumberId}/messages`;
-      
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -116,56 +116,109 @@ class WhatsAppCloudService {
    */
   async sendTextMessage(to: string, message: string) {
     if (!this.isConfigured()) {
+      console.log("[WhatsAppCloud] ⚠️ Service not configured");
       return false;
     }
 
     try {
       // Remove any + or whitespace from phone number
       const cleanNumber = to.replace(/[+\s-]/g, '');
-      
+
+      console.log(`[WhatsAppCloud] 📤 Sending text message...`);
+      console.log(`[WhatsAppCloud]    Original number: ${to}`);
+      console.log(`[WhatsAppCloud]    Cleaned number: ${cleanNumber}`);
+
       const url = `${this.apiUrl}/${this.config!.phoneNumberId}/messages`;
-      
+
+      const payload = {
+        messaging_product: "whatsapp",
+        to: cleanNumber,
+        type: "text",
+        text: {
+          preview_url: true,
+          body: message
+        }
+      };
+
+      console.log(`[WhatsAppCloud]    API URL: ${url}`);
+      console.log(`[WhatsAppCloud]    Phone Number ID: ${this.config!.phoneNumberId}`);
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${this.config!.accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: cleanNumber,
-          type: "text",
-          text: {
-            preview_url: true,
-            body: message
-          }
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
+      console.log(`[WhatsAppCloud]    Response status: ${response.status}`);
+      console.log(`[WhatsAppCloud]    Response data:`, JSON.stringify(data, null, 2));
+
       if (!response.ok) {
-        console.error("[WhatsAppCloud] Message failed:", data);
-        if (data.error?.message?.includes("24 hour")) {
-          console.error("[WhatsAppCloud] ⚠️ Message window expired. User needs to message you first.");
+        console.error("[WhatsAppCloud] ❌ API Error Response:");
+        console.error("[WhatsAppCloud]    Status:", response.status);
+        console.error("[WhatsAppCloud]    Status Text:", response.statusText);
+        console.error("[WhatsAppCloud]    Error Data:", JSON.stringify(data, null, 2));
+
+        if (data.error) {
+          console.error("[WhatsAppCloud]    Error Code:", data.error.code);
+          console.error("[WhatsAppCloud]    Error Message:", data.error.message);
+          console.error("[WhatsAppCloud]    Error Type:", data.error.type);
+          console.error("[WhatsAppCloud]    Error Subcode:", data.error.error_subcode);
+
+          if (data.error.message?.includes("24 hour") || data.error.message?.includes("outside the support window")) {
+            console.error("[WhatsAppCloud] ⚠️ 24-HOUR WINDOW EXPIRED");
+            console.error("[WhatsAppCloud]    The user needs to message your WhatsApp number first");
+            console.error("[WhatsAppCloud]    OR use an approved message template for business-initiated messages");
+          }
+
+          if (data.error.code === 131047 || data.error.message?.includes("recipient phone number not registered")) {
+            console.error("[WhatsAppCloud] ⚠️ PHONE NUMBER NOT REGISTERED");
+            console.error("[WhatsAppCloud]    The phone number is not registered on WhatsApp");
+            console.error("[WhatsAppCloud]    OR the number is not in the sandbox (for test mode)");
+          }
+
+          if (data.error.code === 131031 || data.error.message?.includes("User's number is part of an experiment")) {
+            console.error("[WhatsAppCloud] ⚠️ SANDBOX RESTRICTION");
+            console.error("[WhatsAppCloud]    User must send the join code to your test number");
+            console.error("[WhatsAppCloud]    Check Meta Business Manager for the join code");
+          }
         }
+
         return false;
       }
 
       console.log("[WhatsAppCloud] ✅ Message sent successfully");
+      console.log("[WhatsAppCloud]    Message ID:", data.messages?.[0]?.id);
       return true;
     } catch (error) {
-      console.error("[WhatsAppCloud] Error sending message:", error);
+      console.error("[WhatsAppCloud] ❌ Exception in sendTextMessage:");
+      console.error("[WhatsAppCloud]    Error:", error instanceof Error ? error.message : String(error));
+      console.error("[WhatsAppCloud]    Stack:", error instanceof Error ? error.stack : 'No stack trace');
       return false;
     }
   }
 
   async sendExpiryNotification(user: User, expiringItems: FoodItem[]): Promise<boolean> {
     if (!this.isConfigured()) {
+      console.log("[WhatsAppCloud] ⚠️ Service not configured");
+      return false;
+    }
+
+    if (!user.mobile) {
+      console.error("[WhatsAppCloud] ❌ User has no mobile number");
       return false;
     }
 
     try {
+      console.log(`[WhatsAppCloud] ========================================`);
+      console.log(`[WhatsAppCloud] 📱 Sending WhatsApp notification to ${user.username}`);
+      console.log(`[WhatsAppCloud]    Mobile: ${user.mobile}`);
+      console.log(`[WhatsAppCloud]    Items count: ${expiringItems.length}`);
+
       const itemsList = expiringItems
         .map((item) => {
           const daysLeft = this.calculateDaysLeft(item.expiryDate);
@@ -187,9 +240,33 @@ ${itemsList}
 💡 Check your dashboard to avoid waste!
 ${process.env.APP_URL || "http://localhost:5000"}/dashboard`;
 
-      return await this.sendTextMessage(user.mobile, message);
+      console.log(`[WhatsAppCloud]    Message length: ${message.length} characters`);
+
+      // Try sending text message first
+      const textResult = await this.sendTextMessage(user.mobile, message);
+
+      if (textResult) {
+        console.log(`[WhatsAppCloud] ✅ Text message sent successfully`);
+        console.log(`[WhatsAppCloud] ========================================`);
+        return true;
+      }
+
+      // If text message failed, log detailed troubleshooting
+      console.log(`[WhatsAppCloud] ❌ Text message failed`);
+      console.log(`[WhatsAppCloud] 🔍 TROUBLESHOOTING GUIDE:`);
+      console.log(`[WhatsAppCloud]    1. Check if user is in WhatsApp Business sandbox`);
+      console.log(`[WhatsAppCloud]    2. Verify phone number format: ${user.mobile}`);
+      console.log(`[WhatsAppCloud]    3. For sandbox: User must send join code to your test number`);
+      console.log(`[WhatsAppCloud]    4. For production: Phone number must be verified in Meta Business`);
+      console.log(`[WhatsAppCloud]    5. Check if 24-hour messaging window is active`);
+      console.log(`[WhatsAppCloud] 💡 TIP: For business-initiated messages, create an approved template`);
+      console.log(`[WhatsAppCloud] ========================================`);
+
+      return false;
     } catch (error) {
-      console.error("[WhatsAppCloud] Error in sendExpiryNotification:", error);
+      console.error("[WhatsAppCloud] ❌ Error in sendExpiryNotification:");
+      console.error("[WhatsAppCloud]    Error:", error instanceof Error ? error.message : String(error));
+      console.error("[WhatsAppCloud] ========================================");
       return false;
     }
   }

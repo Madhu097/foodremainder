@@ -44,37 +44,57 @@ class NotificationChecker {
         return results;
       }
 
-      for (const user of users) {
+      // Process each user with detailed logging
+      for (let i = 0; i < users.length; i++) {
+        const user = users[i];
         try {
-          console.log(`[NotificationChecker] 👤 Checking user: ${user.username} (${user.email})`);
+          console.log(`[NotificationChecker] ========================================`);
+          console.log(`[NotificationChecker] 👤 Processing user ${i + 1}/${totalUsers}`);
+          console.log(`[NotificationChecker]    Username: ${user.username}`);
+          console.log(`[NotificationChecker]    Email: ${user.email}`);
+          console.log(`[NotificationChecker]    Mobile: ${user.mobile}`);
+          console.log(`[NotificationChecker]    User ID: ${user.id}`);
+
           const result = await this.checkAndNotifyUser(user);
 
           if (result) {
             results.push(result);
             usersWithNotifications++;
-            console.log(`[NotificationChecker] ✅ Notifications sent to ${user.username}: Email=${result.emailSent}, Push=${result.pushSent}, WhatsApp=${result.whatsappSent}, SMS=${result.smsSent}, Telegram=${result.telegramSent}`);
+            console.log(`[NotificationChecker] ✅ SUCCESS for ${user.username}:`);
+            console.log(`[NotificationChecker]    Email: ${result.emailSent ? '✅' : '❌'}`);
+            console.log(`[NotificationChecker]    WhatsApp: ${result.whatsappSent ? '✅' : '❌'}`);
+            console.log(`[NotificationChecker]    SMS: ${result.smsSent ? '✅' : '❌'}`);
+            console.log(`[NotificationChecker]    Telegram: ${result.telegramSent ? '✅' : '❌'}`);
+            console.log(`[NotificationChecker]    Browser Push: ${result.pushSent ? '✅' : '❌'}`);
           } else {
             usersSkipped++;
-            console.log(`[NotificationChecker] ⏭️ Skipped ${user.username} (no expiring items or notifications disabled)`);
+            console.log(`[NotificationChecker] ⏭️ SKIPPED ${user.username}`);
+            console.log(`[NotificationChecker]    Reason: No expiring items, notifications disabled, or in quiet hours`);
           }
         } catch (error) {
           usersFailed++;
-          console.error(`[NotificationChecker] ❌ Error checking user ${user.username} (${user.id}):`, error instanceof Error ? error.message : String(error));
+          console.error(`[NotificationChecker] ========================================`);
+          console.error(`[NotificationChecker] ❌ FAILED for user ${user.username} (${user.id})`);
+          console.error(`[NotificationChecker]    Error:`, error instanceof Error ? error.message : String(error));
+          console.error(`[NotificationChecker]    Stack:`, error instanceof Error ? error.stack : 'No stack trace');
+          console.error(`[NotificationChecker] ========================================`);
           // Continue processing other users even if one fails
         }
       }
 
       console.log("[NotificationChecker] ========================================");
-      console.log("[NotificationChecker] 📊 Notification check completed:");
+      console.log("[NotificationChecker] 📊 FINAL SUMMARY:");
       console.log(`[NotificationChecker]    Total users: ${totalUsers}`);
-      console.log(`[NotificationChecker]    Notifications sent: ${usersWithNotifications}`);
-      console.log(`[NotificationChecker]    Skipped: ${usersSkipped}`);
-      console.log(`[NotificationChecker]    Failed: ${usersFailed}`);
+      console.log(`[NotificationChecker]    ✅ Notifications sent: ${usersWithNotifications}`);
+      console.log(`[NotificationChecker]    ⏭️ Skipped: ${usersSkipped}`);
+      console.log(`[NotificationChecker]    ❌ Failed: ${usersFailed}`);
       console.log("[NotificationChecker] ========================================");
 
       return results;
     } catch (error) {
-      console.error("[NotificationChecker] ❌ Critical error during notification check:", error);
+      console.error("[NotificationChecker] ❌ CRITICAL ERROR during notification check:");
+      console.error("[NotificationChecker]    Error:", error instanceof Error ? error.message : String(error));
+      console.error("[NotificationChecker]    Stack:", error instanceof Error ? error.stack : 'No stack trace');
       return results;
     }
   }
@@ -177,7 +197,7 @@ class NotificationChecker {
     if (whatsappEnabled) {
       console.log(`[NotificationChecker] 📱 Attempting to send WhatsApp notification...`);
       console.log(`[NotificationChecker] User mobile: ${user.mobile}`);
-      
+
       if (whatsappCloudService.isConfigured()) {
         console.log(`[NotificationChecker] Using WhatsApp Cloud API...`);
         result.whatsappSent = await whatsappCloudService.sendExpiryNotification(user, expiringItems);
@@ -188,7 +208,7 @@ class NotificationChecker {
         console.log(`[NotificationChecker] ⚠️ WhatsApp enabled but no service configured`);
       }
       console.log(`[NotificationChecker] WhatsApp result: ${result.whatsappSent ? '✅ Sent' : '❌ Failed'}`);
-      
+
       if (!result.whatsappSent) {
         console.log(`[NotificationChecker] 🔍 WhatsApp troubleshooting:`);
         console.log(`[NotificationChecker]    - Check if user joined Twilio sandbox`);

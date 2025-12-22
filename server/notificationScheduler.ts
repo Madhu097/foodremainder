@@ -41,25 +41,37 @@ class NotificationScheduler {
             return;
         }
 
+        // Check if test mode is enabled (runs every 30 minutes for testing)
+        const testMode = process.env.NOTIFICATION_SCHEDULE_TEST === "true";
+
         // Generate schedule based on number of times per day (default: 1)
         const timesPerDay = parseInt(process.env.NOTIFICATION_TIMES_PER_DAY || "1");
-        const defaultSchedule = this.generateSchedule(timesPerDay);
+        const defaultSchedule = testMode ? "*/30 * * * *" : this.generateSchedule(timesPerDay);
         const schedule = cronExpression || process.env.NOTIFICATION_SCHEDULE || defaultSchedule;
 
         console.log(`[NotificationScheduler] 🕐 Starting notification scheduler...`);
         console.log(`[NotificationScheduler] 📅 Schedule: ${schedule}`);
         console.log(`[NotificationScheduler] 🔔 Notifications per day: ${timesPerDay}`);
-        console.log(`[NotificationScheduler] 💡 Tip: Customize with NOTIFICATION_SCHEDULE or NOTIFICATION_TIMES_PER_DAY in .env`);
+        if (testMode) {
+            console.log(`[NotificationScheduler] 🧪 TEST MODE ENABLED - Running every 30 minutes`);
+            console.log(`[NotificationScheduler] 💡 Set NOTIFICATION_SCHEDULE_TEST=false in .env to disable test mode`);
+        } else {
+            console.log(`[NotificationScheduler] 💡 Tip: Set NOTIFICATION_SCHEDULE_TEST=true for testing (runs every 30 min)`);
+        }
+        console.log(`[NotificationScheduler] 💡 Customize with NOTIFICATION_SCHEDULE or NOTIFICATION_TIMES_PER_DAY in .env`);
 
         this.scheduledTask = cron.schedule(schedule, async () => {
-            console.log(`[NotificationScheduler] ⏰ Scheduled notification check triggered`);
+            const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+            console.log(`[NotificationScheduler] ========================================`);
+            console.log(`[NotificationScheduler] ⏰ Scheduled notification check triggered at ${now}`);
+            console.log(`[NotificationScheduler] ========================================`);
             try {
                 await notificationChecker.checkAndNotifyAll();
             } catch (error) {
                 console.error("[NotificationScheduler] ❌ Error during scheduled check:", error);
             }
         }, {
-            timezone: process.env.TIMEZONE || "UTC" // Default to UTC, can be customized
+            timezone: process.env.TIMEZONE || "Asia/Kolkata" // Default to IST
         });
 
         this.scheduledTask.start();
@@ -69,6 +81,7 @@ class NotificationScheduler {
         // Show next execution time
         const nextExecution = this.getNextExecutionTime(schedule);
         console.log(`[NotificationScheduler] 📌 Next check: ${nextExecution}`);
+        console.log(`[NotificationScheduler] 📌 Current time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
     }
 
     /**

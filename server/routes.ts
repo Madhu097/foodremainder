@@ -7,6 +7,7 @@ import { createHash } from "crypto";
 import { emailService } from "./emailService";
 import { whatsappService } from "./whatsappService";
 import { whatsappCloudService } from "./whatsappCloudService";
+import { whatsappVerificationService } from "./whatsappVerificationService";
 import { smsService } from "./smsService";
 import { telegramService } from "./telegramService";
 import { pushService } from "./pushService";
@@ -620,6 +621,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       botUsername: telegramService.getBotUsername()
     });
+  });
+
+  // WhatsApp Verification Routes
+
+  // Request WhatsApp verification code
+  app.post("/api/notifications/whatsapp/request-code", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const result = await whatsappVerificationService.sendVerificationCode(user);
+
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("[WhatsApp] Request code error:", error);
+      res.status(500).json({ message: "Failed to send verification code" });
+    }
+  });
+
+  // Verify WhatsApp code
+  app.post("/api/notifications/whatsapp/verify-code", async (req: Request, res: Response) => {
+    try {
+      const { userId, code } = req.body;
+
+      if (!userId || !code) {
+        return res.status(400).json({ message: "User ID and code are required" });
+      }
+
+      const result = await whatsappVerificationService.verifyCode(userId, code);
+
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("[WhatsApp] Verify code error:", error);
+      res.status(500).json({ message: "Failed to verify code" });
+    }
+  });
+
+  // Get WhatsApp verification status
+  app.get("/api/notifications/whatsapp/status/:userId", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+
+      const status = await whatsappVerificationService.getVerificationStatus(userId);
+      res.status(200).json(status);
+    } catch (error) {
+      console.error("[WhatsApp] Status check error:", error);
+      res.status(500).json({ message: "Failed to check verification status" });
+    }
+  });
+
+  // Disconnect WhatsApp
+  app.post("/api/notifications/whatsapp/disconnect", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const result = await whatsappVerificationService.disconnectWhatsApp(userId);
+
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("[WhatsApp] Disconnect error:", error);
+      res.status(500).json({ message: "Failed to disconnect WhatsApp" });
+    }
   });
 
   const httpServer = createServer(app);
