@@ -15,8 +15,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Initialize auth state from localStorage immediately to prevent mismatches
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const userStr = safeLocalStorage.getItem("user");
+    return !!userStr;
+  });
+  
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    const userStr = safeLocalStorage.getItem("user");
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
 
   // All hooks must be at the top - before any conditional returns
   const [modalOpen, setModalOpen] = useState(false);
@@ -24,50 +42,14 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filterStatus, setFilterStatus] = useState<"all" | "fresh" | "expiring" | "expired">("all");
   const [showFreeNotification, setShowFreeNotification] = useState(true);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Helper function to calculate item status and days left
-  const calculateItemStatus = (item: any): FoodItem => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expiryDate = new Date(item.expiryDate);
-    expiryDate.setHours(0, 0, 0, 0);
-
-    const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    let status: "fresh" | "expiring" | "expired" = "fresh";
-    if (daysLeft < 0) {
-      status = "expired";
-    } else if (daysLeft <= 3) {
-      status = "expiring";
-    }
-
-    return {
-      ...item,
-      status,
-      daysLeft,
-    };
-  };
-
-  // Check authentication
+  // Check authentication once on mount
   useEffect(() => {
-    const userStr = safeLocalStorage.getItem("user");
-    if (!userStr) {
-      setLocation("/auth?mode=login");
-      return;
-    }
-
-    try {
-      const user = JSON.parse(userStr);
-      setCurrentUser(user);
-      setIsAuthenticated(true);
-    } catch (err) {
-      safeLocalStorage.removeItem("user");
+    if (!isAuthenticated || !currentUser) {
       setLocation("/auth?mode=login");
     }
-  }, [setLocation]);
-
+  }, []);
+  
   // Fetch food items using React Query for automatic caching and background refresh
   // Using optimized batch endpoint that fetches everything in one request
   const { data: foodItemsData, isLoading, error, refetch } = useQuery({
@@ -130,11 +112,6 @@ export default function DashboardPage() {
     setCurrentUser(null);
     setLocation("/");
   };
-
-  // Show loading or nothing while checking auth
-  if (!isAuthenticated) {
-    return null;
-  }
 
   // Create mutation for adding food items with optimistic updates
   const addFoodMutation = useMutation({
@@ -307,6 +284,11 @@ export default function DashboardPage() {
     expiring: foodItems.filter((i) => i.status === "expiring").length,
     expired: foodItems.filter((i) => i.status === "expired").length,
   };
+
+  // Show loading or nothing while checking auth
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
