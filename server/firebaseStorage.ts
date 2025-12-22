@@ -221,7 +221,6 @@ export class FirebaseStorage implements IStorage {
             browserNotifications: "false",
             quietHoursStart: null,
             quietHoursEnd: null,
-            callmebotApiKey: null,
             createdAt: new Date().toISOString(),
         };
 
@@ -293,7 +292,7 @@ export class FirebaseStorage implements IStorage {
 
     async updateNotificationPreferences(
         userId: string,
-        preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd' | 'callmebotApiKey'>>
+        preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
     ): Promise<boolean> {
         if (!db) throw new Error("Firestore not initialized");
         try {

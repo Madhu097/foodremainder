@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -21,7 +21,6 @@ interface NotificationPreferences {
   notificationsPerDay: number; // 1-4 times per day
   quietHoursStart?: string | null;
   quietHoursEnd?: string | null;
-  callmebotApiKey?: string | null;
   servicesConfigured?: {
     email: boolean;
     whatsapp: boolean;
@@ -306,14 +305,12 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
     notificationsPerDay: 1,
     quietHoursStart: "",
     quietHoursEnd: "",
-    callmebotApiKey: null,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [botUsername, setBotUsername] = useState<string | null>(null);
-  const [callmebotApiKey, setCallmebotApiKey] = useState("");
   const { toast } = useToast();
 
   // Detect if browser supports push notifications
@@ -374,9 +371,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
         ...data,
         quietHoursStart: data.quietHoursStart || "",
         quietHoursEnd: data.quietHoursEnd || "",
-        callmebotApiKey: data.callmebotApiKey || null,
       });
-      setCallmebotApiKey(data.callmebotApiKey || "");
     } catch (error) {
       console.error("Error fetching notification preferences:", error);
       toast({
@@ -616,7 +611,6 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
           notificationsPerDay: preferences.notificationsPerDay,
           quietHoursStart: preferences.quietHoursStart || null,
           quietHoursEnd: preferences.quietHoursEnd || null,
-          callmebotApiKey: callmebotApiKey || null,
         }),
         credentials: "include",
       });
@@ -821,57 +815,6 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             {/* WhatsApp Verification Section */}
             {preferences.whatsappNotifications && (preferences.servicesConfigured?.whatsapp || preferences.servicesConfigured?.whatsappCloud) && (
               <WhatsAppVerification userId={userId} />
-            )}
-
-            {/* CallMeBot WhatsApp Setup (FREE, No Registration) */}
-            {preferences.whatsappNotifications && (
-              <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <MessageCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <h4 className="font-semibold text-green-900 dark:text-green-100">
-                        🎉 FREE WhatsApp via CallMeBot (No Registration!)
-                      </h4>
-                      <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                        Get WhatsApp notifications without any Meta developer account or complicated setup!
-                      </p>
-                    </div>
-
-                    <div className="space-y-2 text-sm">
-                      <p className="font-medium text-green-900 dark:text-green-100">Quick Setup (3 steps):</p>
-                      <ol className="list-decimal list-inside space-y-1 text-green-700 dark:text-green-300">
-                        <li>Save <strong>+34 644 34 87 08</strong> to your phone contacts</li>
-                        <li>Send this message to that number on WhatsApp:<br/>
-                          <code className="block mt-1 p-2 bg-white dark:bg-gray-900 rounded text-xs">
-                            I allow callmebot to send me messages
-                          </code>
-                        </li>
-                        <li>You'll receive an API key - paste it below:</li>
-                      </ol>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="callmebot-api-key" className="text-sm font-medium text-green-900 dark:text-green-100">
-                        Your CallMeBot API Key
-                      </Label>
-                      <Input
-                        id="callmebot-api-key"
-                        type="text"
-                        placeholder="Paste your API key here (e.g., 123456)"
-                        value={callmebotApiKey}
-                        onChange={(e) => setCallmebotApiKey(e.target.value)}
-                        className="bg-white dark:bg-gray-900"
-                      />
-                      <p className="text-xs text-green-600 dark:text-green-400">
-                        💡 Free forever • No account needed • Works immediately
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
           </div>
 
