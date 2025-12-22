@@ -19,6 +19,7 @@ export interface User {
   smsNotifications: string;
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
+  callmebotApiKey: string | null; // CallMeBot WhatsApp API key (free, no registration needed)
   createdAt: string;
 }
 

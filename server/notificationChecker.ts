@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import { emailService } from "./emailService";
 import { whatsappService } from "./whatsappService";
 import { whatsappCloudService } from "./whatsappCloudService";
+import { callmebotService } from "./callmebotService";
 import { smsService } from "./smsService";
 import { telegramService } from "./telegramService";
 import { pushService } from "./pushService";
@@ -193,19 +194,31 @@ class NotificationChecker {
       console.log(`[NotificationChecker] ⏭️ Skipping email (enabled: ${emailEnabled}, configured: ${emailService.isConfigured()})`);
     }
 
-    // Send WhatsApp notification (try free Cloud API first, then Twilio)
+    // Send WhatsApp notification (try CallMeBot first, then Cloud API, then Twilio)
     if (whatsappEnabled) {
       console.log(`[NotificationChecker] 📱 Attempting to send WhatsApp notification...`);
       console.log(`[NotificationChecker] User mobile: ${user.mobile}`);
 
-      if (whatsappCloudService.isConfigured()) {
+      // Try CallMeBot first (free, no account needed)
+      if ((user as any).callmebotApiKey) {
+        console.log(`[NotificationChecker] Using CallMeBot (free, no registration)...`);
+        result.whatsappSent = await callmebotService.sendExpiryNotification(user, expiringItems);
+      }
+      // Fallback to WhatsApp Cloud API
+      else if (whatsappCloudService.isConfigured()) {
         console.log(`[NotificationChecker] Using WhatsApp Cloud API...`);
         result.whatsappSent = await whatsappCloudService.sendExpiryNotification(user, expiringItems);
-      } else if (whatsappService.isConfigured()) {
+      } 
+      // Fallback to Twilio
+      else if (whatsappService.isConfigured()) {
         console.log(`[NotificationChecker] Using Twilio WhatsApp...`);
         result.whatsappSent = await whatsappService.sendExpiryNotification(user, expiringItems);
       } else {
         console.log(`[NotificationChecker] ⚠️ WhatsApp enabled but no service configured`);
+        console.log(`[NotificationChecker] 💡 Setup CallMeBot (FREE, no registration):`);
+        console.log(`[NotificationChecker]    1. Save +34 644 34 87 08 to your contacts`);
+        console.log(`[NotificationChecker]    2. Send "I allow callmebot to send me messages"`);
+        console.log(`[NotificationChecker]    3. Add the API key you receive to your profile`);
       }
       console.log(`[NotificationChecker] WhatsApp result: ${result.whatsappSent ? '✅ Sent' : '❌ Failed'}`);
 

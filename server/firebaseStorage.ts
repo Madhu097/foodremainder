@@ -48,16 +48,16 @@ class Cache<T> {
 }
 
 export class FirebaseStorage implements IStorage {
-    // Caches with 30 second TTL
-    private userCache = new Cache<User>(30);
-    private foodItemsCache = new Cache<FoodItem[]>(30);
-    private allUsersCache = new Cache<User[]>(60); // Longer TTL for all users
+    // Caches with longer TTL for better performance
+    private userCache = new Cache<User>(120); // 2 minutes
+    private foodItemsCache = new Cache<FoodItem[]>(60); // 1 minute
+    private allUsersCache = new Cache<User[]>(180); // 3 minutes for all users
 
     constructor() {
         if (!db) {
             throw new Error("Firebase Firestore not initialized. Check Firebase configuration.");
         }
-        console.log("[FirebaseStorage] ✅ Initialized with caching enabled (30s TTL)");
+        console.log("[FirebaseStorage] ✅ Initialized with enhanced caching (60-180s TTL)");
     }
 
     // User methods
@@ -221,6 +221,7 @@ export class FirebaseStorage implements IStorage {
             browserNotifications: "false",
             quietHoursStart: null,
             quietHoursEnd: null,
+            callmebotApiKey: null,
             createdAt: new Date().toISOString(),
         };
 
@@ -292,7 +293,7 @@ export class FirebaseStorage implements IStorage {
 
     async updateNotificationPreferences(
         userId: string,
-        preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>
+        preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd' | 'callmebotApiKey'>>
     ): Promise<boolean> {
         if (!db) throw new Error("Firestore not initialized");
         try {
@@ -370,11 +371,13 @@ export class FirebaseStorage implements IStorage {
         const cacheKey = `foodItems:${userId}`;
         const cached = this.foodItemsCache.get(cacheKey);
         if (cached) {
+            console.log(`[FirebaseStorage] 🚀 Cache hit for food items: ${userId} (${cached.length} items)`);
             return cached;
         }
 
+        console.log(`[FirebaseStorage] 💾 Fetching food items from database for user: ${userId}`);
         try {
-            // Try with orderBy first (requires Firestore index)
+            // Try with orderBy first (requires Firestore index) - ordered by expiry for faster processing
             const snapshot = await db.collection('foodItems')
                 .where('userId', '==', userId)
                 .orderBy('expiryDate', 'asc')
@@ -382,8 +385,9 @@ export class FirebaseStorage implements IStorage {
 
             const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
 
-            // Cache the results
+            // Cache the results for 60 seconds
             this.foodItemsCache.set(cacheKey, items);
+            console.log(`[FirebaseStorage] ✅ Cached ${items.length} food items for user: ${userId}`);
 
             return items;
         } catch (error: any) {

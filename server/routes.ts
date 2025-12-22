@@ -43,6 +43,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Optimized batch endpoint - fetch user data and food items in one request
+  app.get("/api/dashboard/:userId", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      // Set cache headers for faster subsequent loads
+      res.setHeader('Cache-Control', 'private, max-age=60');
+      
+      // Fetch user and items in parallel for better performance
+      const [user, items] = await Promise.all([
+        storage.getUser(userId),
+        storage.getFoodItemsByUserId(userId)
+      ]);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Calculate status and days left on server-side
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const itemsWithStatus = items.map(item => {
+        const expiryDate = new Date(item.expiryDate);
+        expiryDate.setHours(0, 0, 0, 0);
+
+        const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        let status: "fresh" | "expiring" | "expired" = "fresh";
+        if (daysLeft < 0) {
+          status = "expired";
+        } else if (daysLeft <= 3) {
+          status = "expiring";
+        }
+
+        return {
+          ...item,
+          status,
+          daysLeft,
+        };
+      });
+
+      // Don't send password back
+      const { password, ...userWithoutPassword } = user;
+
+      res.status(200).json({ 
+        user: userWithoutPassword,
+        items: itemsWithStatus 
+      });
+    } catch (error: any) {
+      console.error("[Dashboard] Error:", error);
+      res.status(500).json({ message: "Failed to load dashboard data", error: error?.message });
+    }
+  });
+
   // CORS test endpoint
   app.get("/api/test-cors", (req: Request, res: Response) => {
     res.status(200).json({
@@ -330,7 +389,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('ETag', `food-items-${userId}-${Date.now()}`);
 
       const items = await storage.getFoodItemsByUserId(userId);
-      res.status(200).json({ items });
+      
+      // Calculate status and days left on server-side to reduce client processing
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const itemsWithStatus = items.map(item => {
+        const expiryDate = new Date(item.expiryDate);
+        expiryDate.setHours(0, 0, 0, 0);
+
+        const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        let status: "fresh" | "expiring" | "expired" = "fresh";
+        if (daysLeft < 0) {
+          status = "expired";
+        } else if (daysLeft <= 3) {
+          status = "expiring";
+        }
+
+        return {
+          ...item,
+          status,
+          daysLeft,
+        };
+      });
+
+      res.status(200).json({ items: itemsWithStatus });
     } catch (error: any) {
       console.error("[FoodItems] Get items error:", error);
       console.error("[FoodItems] Error message:", error?.message);

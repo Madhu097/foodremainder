@@ -4,6 +4,9 @@ import { ThemeToggle } from "./ThemeToggle";
 import { Menu, X, User, HelpCircle } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
+import { API_BASE_URL } from "@/lib/api";
+import { safeLocalStorage } from "@/lib/storage";
 
 interface NavbarProps {
   isAuthenticated?: boolean;
@@ -19,6 +22,34 @@ export function Navbar({
   onLogoutClick,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Prefetch dashboard data on hover for instant loading
+  const handleDashboardHover = () => {
+    if (isAuthenticated) {
+      const userStr = safeLocalStorage.getItem("user");
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          queryClient.prefetchQuery({
+            queryKey: ['foodItems', user.id],
+            queryFn: async () => {
+              // Use optimized batch endpoint
+              const response = await fetch(`${API_BASE_URL}/api/dashboard/${user.id}`, {
+                credentials: "include",
+              });
+              if (!response.ok) throw new Error("Failed to prefetch");
+              const data = await response.json();
+              return { items: data.items };
+            },
+            staleTime: 60000,
+          });
+        } catch (err) {
+          console.error("Prefetch error:", err);
+        }
+      }
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 backdrop-blur-lg bg-background/90 border-b">
@@ -43,7 +74,12 @@ export function Navbar({
           <div className="hidden md:flex items-center gap-6">
             {isAuthenticated && (
               <>
-                <Link href="/dashboard" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md" data-testid="link-dashboard">
+                <Link 
+                  href="/dashboard" 
+                  className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md" 
+                  data-testid="link-dashboard"
+                  onMouseEnter={handleDashboardHover}
+                >
                   Dashboard
                 </Link>
                 <Link href="/profile" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md flex items-center gap-2" data-testid="link-profile">

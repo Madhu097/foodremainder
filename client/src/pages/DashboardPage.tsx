@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { safeLocalStorage } from "@/lib/storage";
 import { API_BASE_URL } from "@/lib/api";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -21,12 +22,10 @@ export default function DashboardPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [filterStatus, setFilterStatus] = useState<"all" | "fresh" | "expiring" | "expired">("all");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>("");
   const [showFreeNotification, setShowFreeNotification] = useState(true);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Helper function to calculate item status and days left
   const calculateItemStatus = (item: any): FoodItem => {
@@ -51,31 +50,66 @@ export default function DashboardPage() {
     };
   };
 
-  // Check authentication and load user's food items
+  // Check authentication
   useEffect(() => {
-    const loadUserData = async () => {
-      // Check if user is logged in
-      const userStr = safeLocalStorage.getItem("user");
-      if (!userStr) {
-        setLocation("/auth?mode=login");
-        return;
-      }
+    const userStr = safeLocalStorage.getItem("user");
+    if (!userStr) {
+      setLocation("/auth?mode=login");
+      return;
+    }
 
-      try {
-        const user = JSON.parse(userStr);
-        setCurrentUser(user);
-        setIsAuthenticated(true);
-
-        // Fetch user's food items
-        await fetchFoodItems(user.id);
-      } catch (err) {
-        safeLocalStorage.removeItem("user");
-        setLocation("/auth?mode=login");
-      }
-    };
-
-    loadUserData();
+    try {
+      const user = JSON.parse(userStr);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+    } catch (err) {
+      safeLocalStorage.removeItem("user");
+      setLocation("/auth?mode=login");
+    }
   }, [setLocation]);
+
+  // Fetch food items using React Query for automatic caching and background refresh
+  // Using optimized batch endpoint that fetches everything in one request
+  const { data: foodItemsData, isLoading, error, refetch } = useQuery({
+    queryKey: ['foodItems', currentUser?.id],
+    queryFn: async () => {
+      if (!currentUser?.id) return { items: [] };
+      
+      // Try the optimized batch endpoint first
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/dashboard/${currentUser.id}`, {
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          return { items: data.items }; // Return just items for compatibility
+        }
+      } catch (err) {
+        console.log("Batch endpoint not available, falling back to individual endpoint");
+      }
+
+      // Fallback to individual endpoint
+      const response = await fetch(`${API_BASE_URL}/api/food-items/${currentUser.id}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch food items");
+      }
+
+      return response.json();
+    },
+    enabled: !!currentUser?.id,
+    staleTime: 60000, // Cache for 1 minute
+    gcTime: 300000, // Keep in cache for 5 minutes
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    refetchOnMount: false, // Don't refetch on mount if data is fresh
+    refetchOnReconnect: true, // Refetch when reconnecting to internet
+  });
+
+  // Server now returns items with status pre-calculated
+  const foodItems = foodItemsData?.items || [];
 
   // Check if free notification was dismissed
   useEffect(() => {
@@ -90,32 +124,6 @@ export default function DashboardPage() {
     safeLocalStorage.setItem("freeNotificationDismissed", "true");
   };
 
-  // Fetch food items for the current user
-  const fetchFoodItems = async (userId: string) => {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/food-items/${userId}`, {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch food items");
-      }
-
-      const data = await response.json();
-      const itemsWithStatus = data.items.map(calculateItemStatus);
-      setFoodItems(itemsWithStatus);
-    } catch (err) {
-      console.error("Error fetching food items:", err);
-      setError("Failed to load your food items. Please try refreshing the page.");
-      setFoodItems([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleLogout = () => {
     safeLocalStorage.removeItem("user");
     setIsAuthenticated(false);
@@ -128,74 +136,113 @@ export default function DashboardPage() {
     return null;
   }
 
+  // Create mutation for adding food items with optimistic updates
+  const addFoodMutation = useMutation({
+    mutationFn: async (data: FoodFormData) => {
+      const response = await fetch(`${API_BASE_URL}/api/food-items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser!.id,
+          ...data,
+        }),
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to add item");
+      return response.json();
+    },
+    onMutate: async (newItem) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['foodItems', currentUser?.id] });
+
+      // Optimistically update the cache
+      const previousData = queryClient.getQueryData(['foodItems', currentUser?.id]);
+      
+      queryClient.setQueryData(['foodItems', currentUser?.id], (old: any) => ({
+        items: [...(old?.items || []), { ...newItem, id: 'temp-' + Date.now() }]
+      }));
+
+      return { previousData };
+    },
+    onError: (err, newItem, context) => {
+      // Rollback on error
+      queryClient.setQueryData(['foodItems', currentUser?.id], context?.previousData);
+      toast({
+        title: "Error",
+        description: "Failed to add food item. Please try again.",
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['foodItems', currentUser?.id] });
+      toast({
+        title: "Added!",
+        description: "Food item added to your inventory.",
+      });
+    },
+  });
+
+  // Create mutation for updating food items
+  const updateFoodMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: FoodFormData }) => {
+      const response = await fetch(`${API_BASE_URL}/api/food-items/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser!.id,
+          ...data,
+        }),
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to update item");
+      return response.json();
+    },
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['foodItems', currentUser?.id] });
+      
+      const previousData = queryClient.getQueryData(['foodItems', currentUser?.id]);
+      
+      queryClient.setQueryData(['foodItems', currentUser?.id], (old: any) => ({
+        items: (old?.items || []).map((item: any) => 
+          item.id === id ? { ...item, ...data } : item
+        )
+      }));
+
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(['foodItems', currentUser?.id], context?.previousData);
+      toast({
+        title: "Error",
+        description: "Failed to update food item. Please try again.",
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['foodItems', currentUser?.id] });
+      toast({
+        title: "Updated!",
+        description: "Food item updated successfully.",
+      });
+    },
+  });
+
   const handleSaveFood = async (data: FoodFormData) => {
     if (!currentUser) return;
 
     try {
       if (editingItem) {
-        // Update existing item
-        const response = await fetch(`${API_BASE_URL}/api/food-items/${editingItem.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: currentUser.id,
-            ...data,
-          }),
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to update item");
-        }
-
-        const result = await response.json();
-        const updatedItem = calculateItemStatus(result.item);
-
-        setFoodItems(foodItems.map((item) =>
-          item.id === editingItem.id ? updatedItem : item
-        ));
-
-        toast({
-          title: "Updated!",
-          description: "Food item updated successfully.",
-        });
-
-        setEditingItem(null);
+        await updateFoodMutation.mutateAsync({ id: editingItem.id, data });
       } else {
-        // Add new item
-        const response = await fetch(`${API_BASE_URL}/api/food-items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: currentUser.id,
-            ...data,
-          }),
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to create item");
-        }
-
-        const result = await response.json();
-        const newItem = calculateItemStatus(result.item);
-
-        setFoodItems([...foodItems, newItem]);
-
-        toast({
-          title: "Added!",
-          description: "Food item added to your inventory.",
-        });
+        await addFoodMutation.mutateAsync(data);
       }
 
       setModalOpen(false);
+      setEditingItem(null);
     } catch (err) {
       console.error("Error saving food item:", err);
-      toast({
-        title: "Error",
-        description: "Failed to save food item. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -204,34 +251,53 @@ export default function DashboardPage() {
     setModalOpen(true);
   };
 
-  const handleDeleteFood = async (item: FoodItem) => {
-    if (!currentUser) return;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/food-items/${item.id}`, {
+  // Create mutation for deleting food items
+  const deleteFoodMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const response = await fetch(`${API_BASE_URL}/api/food-items/${itemId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: currentUser.id }),
+        body: JSON.stringify({ userId: currentUser!.id }),
         credentials: "include",
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to delete item");
-      }
+      if (!response.ok) throw new Error("Failed to delete item");
+      return response.json();
+    },
+    onMutate: async (itemId) => {
+      await queryClient.cancelQueries({ queryKey: ['foodItems', currentUser?.id] });
+      
+      const previousData = queryClient.getQueryData(['foodItems', currentUser?.id]);
+      
+      queryClient.setQueryData(['foodItems', currentUser?.id], (old: any) => ({
+        items: (old?.items || []).filter((item: any) => item.id !== itemId)
+      }));
 
-      setFoodItems(foodItems.filter((i) => i.id !== item.id));
-
-      toast({
-        title: "Deleted!",
-        description: "Food item removed from your inventory.",
-      });
-    } catch (err) {
-      console.error("Error deleting food item:", err);
+      return { previousData };
+    },
+    onError: (err, itemId, context) => {
+      queryClient.setQueryData(['foodItems', currentUser?.id], context?.previousData);
       toast({
         title: "Error",
         description: "Failed to delete food item. Please try again.",
         variant: "destructive",
       });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['foodItems', currentUser?.id] });
+      toast({
+        title: "Deleted!",
+        description: "Food item removed from your inventory.",
+      });
+    },
+  });
+
+  const handleDeleteFood = async (item: FoodItem) => {
+    if (!currentUser) return;
+    try {
+      await deleteFoodMutation.mutateAsync(item.id);
+    } catch (err) {
+      console.error("Error deleting food item:", err);
     }
   };
 
@@ -376,7 +442,9 @@ export default function DashboardPage() {
           {error && (
             <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error instanceof Error ? error.message : "Failed to load your food items. Please try refreshing the page."}
+              </AlertDescription>
             </Alert>
           )}
 
