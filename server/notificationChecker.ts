@@ -18,7 +18,48 @@ interface NotificationResult {
   pushSent: boolean;
 }
 
+// Track last notification time for each user
+const lastNotificationTime = new Map<string, number>();
+
 class NotificationChecker {
+  /**
+   * Check if user should receive notification based on their frequency preference
+   */
+  private shouldNotifyUser(user: User): boolean {
+    const userId = user.id;
+    const notificationsPerDay = parseInt(user.notificationsPerDay || "5");
+    
+    // Calculate minimum hours between notifications based on frequency
+    // 1 per day = 24 hours, 2 = 12 hours, 3 = 8 hours, 4 = 6 hours, 5 = 4.8 hours
+    const hoursPerNotification = 24 / notificationsPerDay;
+    const minMillisecondsBetween = hoursPerNotification * 60 * 60 * 1000;
+    
+    const lastNotified = lastNotificationTime.get(userId);
+    const now = Date.now();
+    
+    if (!lastNotified) {
+      // First notification, allow it
+      return true;
+    }
+    
+    const timeSinceLastNotification = now - lastNotified;
+    const shouldNotify = timeSinceLastNotification >= minMillisecondsBetween;
+    
+    if (!shouldNotify) {
+      const hoursRemaining = ((minMillisecondsBetween - timeSinceLastNotification) / (1000 * 60 * 60)).toFixed(1);
+      console.log(`[NotificationChecker] ⏳ User ${user.username} needs to wait ${hoursRemaining} more hours (${notificationsPerDay}x/day)`);
+    }
+    
+    return shouldNotify;
+  }
+  
+  /**
+   * Record that a notification was sent to a user
+   */
+  private recordNotification(userId: string): void {
+    lastNotificationTime.set(userId, Date.now());
+  }
+
   /**
    * Check all users for expiring food items and send notifications
    */
@@ -127,6 +168,12 @@ class NotificationChecker {
    * Check and notify a specific user
    */
   async checkAndNotifyUser(user: User, itemsOverride?: FoodItem[]): Promise<NotificationResult | null> {
+    // Check frequency preference (skip if override provided - i.e. test mode)
+    if (!itemsOverride && !this.shouldNotifyUser(user)) {
+      console.log(`[NotificationChecker] ⏭️ Skipping notification for user ${user.username} due to frequency preference`);
+      return null;
+    }
+    
     // Check quiet hours (skip if override provided - i.e. test mode)
     if (!itemsOverride && this.isInQuietHours(user)) {
       console.log(`[NotificationChecker] Skipping notification for user ${user.username} due to quiet hours`);
@@ -245,6 +292,12 @@ class NotificationChecker {
       console.log(`[NotificationChecker] Browser Push result: ${result.pushSent ? '✅ Sent' : '❌ Failed'}`);
     } else {
       console.log(`[NotificationChecker] ⏭️ Skipping browser push (enabled: ${pushEnabled}, configured: ${pushService.isConfigured()})`);
+    }
+
+    // Record that notification was sent (even if only some channels succeeded)
+    if (result.emailSent || result.whatsappSent || result.smsSent || result.telegramSent || result.pushSent) {
+      this.recordNotification(user.id);
+      console.log(`[NotificationChecker] ✅ Notification sent to ${user.username}, recorded for frequency tracking`);
     }
 
     return result;

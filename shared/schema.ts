@@ -13,7 +13,7 @@ export interface User {
   telegramNotifications: string;
   telegramChatId: string | null;
   notificationDays: string;
-  notificationsPerDay: string; // Number of times to send notifications per day (1-4)
+  notificationsPerDay: string; // Number of times to send notifications per day (1-5)
   pushSubscriptions: string[]; // Array of JSON stringified PushSubscription objects
   browserNotifications: string;
   smsNotifications: string;

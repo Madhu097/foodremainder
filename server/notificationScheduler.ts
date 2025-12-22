@@ -11,29 +11,10 @@ class NotificationScheduler {
     private isRunning = false;
 
     /**
-     * Generate a cron schedule based on number of notifications per day
-     * 1 = 9am, 2 = 9am,6pm, 3 = 9am,2pm,7pm, 4 = 8am,12pm,4pm,8pm
-     */
-    private generateSchedule(timesPerDay: number): string {
-        const schedules: Record<number, string> = {
-            1: "0 9 * * *",        // 9 AM
-            2: "0 9,18 * * *",     // 9 AM, 6 PM
-            3: "0 9,14,19 * * *",  // 9 AM, 2 PM, 7 PM
-            4: "0 8,12,16,20 * * *" // 8 AM, 12 PM, 4 PM, 8 PM
-        };
-
-        // Default to once daily if invalid
-        return schedules[timesPerDay] || schedules[1];
-    }
-
-    /**
      * Start the notification scheduler
-     * @param cronExpression - Cron expression for schedule (default: based on NOTIFICATION_TIMES_PER_DAY)
-     * Common cron patterns:
-     *   Once daily at 9 AM: "0 9 * * *"
-     *   Twice daily at 9 AM and 6 PM: "0 9,18 * * *"
-     *   Three times: "0 9,14,19 * * *"
-     *   Four times: "0 8,12,16,20 * * *"
+     * Runs 5 times per day: 8 AM, 11 AM, 2 PM, 5 PM, 8 PM
+     * Each user's notification frequency preference is checked individually
+     * @param cronExpression - Cron expression for schedule (optional override)
      */
     start(cronExpression?: string): void {
         if (this.isRunning) {
@@ -44,21 +25,21 @@ class NotificationScheduler {
         // Check if test mode is enabled (runs every 30 minutes for testing)
         const testMode = process.env.NOTIFICATION_SCHEDULE_TEST === "true";
 
-        // Generate schedule based on number of times per day (default: 1)
-        const timesPerDay = parseInt(process.env.NOTIFICATION_TIMES_PER_DAY || "1");
-        const defaultSchedule = testMode ? "*/30 * * * *" : this.generateSchedule(timesPerDay);
+        // Default: 5 times daily at 8 AM, 11 AM, 2 PM, 5 PM, 8 PM
+        const defaultSchedule = testMode ? "*/30 * * * *" : "0 8,11,14,17,20 * * *";
         const schedule = cronExpression || process.env.NOTIFICATION_SCHEDULE || defaultSchedule;
 
         console.log(`[NotificationScheduler] 🕐 Starting notification scheduler...`);
         console.log(`[NotificationScheduler] 📅 Schedule: ${schedule}`);
-        console.log(`[NotificationScheduler] 🔔 Notifications per day: ${timesPerDay}`);
+        console.log(`[NotificationScheduler] 🔔 Frequency: 5 times daily (8 AM, 11 AM, 2 PM, 5 PM, 8 PM)`);
+        console.log(`[NotificationScheduler] 👤 Per-user frequency preferences will be respected`);
         if (testMode) {
             console.log(`[NotificationScheduler] 🧪 TEST MODE ENABLED - Running every 30 minutes`);
             console.log(`[NotificationScheduler] 💡 Set NOTIFICATION_SCHEDULE_TEST=false in .env to disable test mode`);
         } else {
             console.log(`[NotificationScheduler] 💡 Tip: Set NOTIFICATION_SCHEDULE_TEST=true for testing (runs every 30 min)`);
         }
-        console.log(`[NotificationScheduler] 💡 Customize with NOTIFICATION_SCHEDULE or NOTIFICATION_TIMES_PER_DAY in .env`);
+        console.log(`[NotificationScheduler] 💡 Customize with NOTIFICATION_SCHEDULE in .env`);
 
         this.scheduledTask = cron.schedule(schedule, async () => {
             const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
