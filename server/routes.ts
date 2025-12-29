@@ -517,7 +517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         telegramNotifications: user.telegramNotifications === "true",
         telegramChatId: user.telegramChatId || null,
         notificationDays: parseInt(user.notificationDays || "3"),
-        notificationsPerDay: parseInt(user.notificationsPerDay || "1"),
+        notificationsPerDay: parseInt(user.notificationsPerDay || "24"),
         browserNotifications: user.browserNotifications === "true",
         quietHoursStart: user.quietHoursStart,
         quietHoursEnd: user.quietHoursEnd,
@@ -585,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof notificationDays === "number" && notificationDays > 0) {
         preferences.notificationDays = notificationDays.toString();
       }
-      if (typeof notificationsPerDay === "number" && notificationsPerDay >= 1 && notificationsPerDay <= 4) {
+      if (typeof notificationsPerDay === "number" && notificationsPerDay >= 1 && notificationsPerDay <= 24) {
         preferences.notificationsPerDay = notificationsPerDay.toString();
       }
 

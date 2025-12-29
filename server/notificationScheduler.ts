@@ -12,7 +12,7 @@ class NotificationScheduler {
 
     /**
      * Start the notification scheduler
-     * Runs 5 times per day: 8 AM, 11 AM, 2 PM, 5 PM, 8 PM
+     * Runs frequently to check for expiring items
      * Each user's notification frequency preference is checked individually
      * @param cronExpression - Cron expression for schedule (optional override)
      */
@@ -22,11 +22,12 @@ class NotificationScheduler {
             return;
         }
 
-        // Check if test mode is enabled (runs every 30 minutes for testing)
+        // Check if test mode is enabled (runs every 5 minutes for testing)
         const testMode = process.env.NOTIFICATION_SCHEDULE_TEST === "true";
 
         // Default: 5 times daily at 8 AM, 11 AM, 2 PM, 5 PM, 8 PM
-        const defaultSchedule = testMode ? "*/30 * * * *" : "0 8,11,14,17,20 * * *";
+        // Test mode: Every 5 minutes for immediate notifications
+        const defaultSchedule = testMode ? "*/5 * * * *" : "0 8,11,14,17,20 * * *";
         const schedule = cronExpression || process.env.NOTIFICATION_SCHEDULE || defaultSchedule;
 
         console.log(`[NotificationScheduler] 🕐 Starting notification scheduler...`);
@@ -34,10 +35,10 @@ class NotificationScheduler {
         console.log(`[NotificationScheduler] 🔔 Frequency: 5 times daily (8 AM, 11 AM, 2 PM, 5 PM, 8 PM)`);
         console.log(`[NotificationScheduler] 👤 Per-user frequency preferences will be respected`);
         if (testMode) {
-            console.log(`[NotificationScheduler] 🧪 TEST MODE ENABLED - Running every 30 minutes`);
+            console.log(`[NotificationScheduler] 🧪 TEST MODE ENABLED - Running every 5 minutes`);
             console.log(`[NotificationScheduler] 💡 Set NOTIFICATION_SCHEDULE_TEST=false in .env to disable test mode`);
         } else {
-            console.log(`[NotificationScheduler] 💡 Tip: Set NOTIFICATION_SCHEDULE_TEST=true for testing (runs every 30 min)`);
+            console.log(`[NotificationScheduler] 💡 Tip: Set NOTIFICATION_SCHEDULE_TEST=true for testing (runs every 5 min)`);
         }
         console.log(`[NotificationScheduler] 💡 Customize with NOTIFICATION_SCHEDULE in .env`);
 

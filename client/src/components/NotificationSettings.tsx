@@ -17,7 +17,7 @@ interface NotificationPreferences {
   browserNotifications: boolean;
   telegramChatId?: string;
   notificationDays: number;
-  notificationsPerDay: number; // 1-5 times per day
+  notificationsPerDay: number; // 1-24 times per day (hourly)
   quietHoursStart?: string | null;
   quietHoursEnd?: string | null;
   servicesConfigured?: {
@@ -299,7 +299,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
     browserNotifications: false,
     telegramChatId: "",
     notificationDays: 3,
-    notificationsPerDay: 5,
+    notificationsPerDay: 24,
     quietHoursStart: "",
     quietHoursEnd: "",
   });
@@ -594,19 +594,29 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Validate and correct values before saving
+      const validatedPreferences = {
+        ...preferences,
+        notificationDays: Math.max(1, preferences.notificationDays || 3),
+        notificationsPerDay: Math.min(24, Math.max(1, preferences.notificationsPerDay || 24)),
+      };
+      
+      // Update state with validated values
+      setPreferences(validatedPreferences);
+      
       const response = await fetch(`${API_BASE_URL}/api/notifications/preferences/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          emailNotifications: preferences.emailNotifications,
-          whatsappNotifications: preferences.whatsappNotifications,
-          telegramNotifications: preferences.telegramNotifications,
-          browserNotifications: preferences.browserNotifications,
-          telegramChatId: preferences.telegramChatId,
-          notificationDays: preferences.notificationDays,
-          notificationsPerDay: preferences.notificationsPerDay,
-          quietHoursStart: preferences.quietHoursStart || null,
-          quietHoursEnd: preferences.quietHoursEnd || null,
+          emailNotifications: validatedPreferences.emailNotifications,
+          whatsappNotifications: validatedPreferences.whatsappNotifications,
+          telegramNotifications: validatedPreferences.telegramNotifications,
+          browserNotifications: validatedPreferences.browserNotifications,
+          telegramChatId: validatedPreferences.telegramChatId,
+          notificationDays: validatedPreferences.notificationDays,
+          notificationsPerDay: validatedPreferences.notificationsPerDay,
+          quietHoursStart: validatedPreferences.quietHoursStart || null,
+          quietHoursEnd: validatedPreferences.quietHoursEnd || null,
         }),
         credentials: "include",
       });
@@ -946,16 +956,29 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                value={preferences.notificationDays === 0 ? '' : preferences.notificationDays.toString()}  // ✅ CHANGED
+                value={preferences.notificationDays === 0 ? '' : preferences.notificationDays.toString()}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
                   if (val === '') {
-                    setPreferences({ ...preferences, notificationDays: 0 });  // ✅ CHANGED TO 0
+                    setPreferences({ ...preferences, notificationDays: 0 });
                   } else {
                     const num = parseInt(val);
-                    if (!isNaN(num) && num <= 99) {  // ✅ REMOVED >= 1 CHECK
+                    if (!isNaN(num) && num <= 99) {
                       setPreferences({ ...preferences, notificationDays: num });
                     }
+                  }
+                }}
+                onBlur={(e) => {
+                  // Validate and correct on blur
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  const num = val === '' ? 3 : parseInt(val);
+                  
+                  if (isNaN(num) || num < 1) {
+                    setPreferences({ ...preferences, notificationDays: 1 });
+                  } else if (num > 30) {
+                    setPreferences({ ...preferences, notificationDays: 30 });
+                  } else {
+                    setPreferences({ ...preferences, notificationDays: num });
                   }
                 }}
                 className="w-24"
@@ -975,13 +998,31 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
             <div className="flex items-center gap-3">
               <Input
                 id="notifications-per-day"
-                type="number"
-                min="1"
-                max="5"
-                value={preferences.notificationsPerDay}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={preferences.notificationsPerDay === 0 ? '' : preferences.notificationsPerDay.toString()}
                 onChange={(e) => {
-                  const num = parseInt(e.target.value);
-                  if (!isNaN(num) && num >= 1 && num <= 5) {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  if (val === '') {
+                    setPreferences({ ...preferences, notificationsPerDay: 0 }); // Temporarily set to 0 during editing
+                  } else {
+                    const num = parseInt(val);
+                    if (!isNaN(num) && num <= 99) { // Allow any number up to 99 during typing
+                      setPreferences({ ...preferences, notificationsPerDay: num });
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  // Validate and correct on blur
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  const num = val === '' ? 24 : parseInt(val);
+                  
+                  if (isNaN(num) || num < 1) {
+                    setPreferences({ ...preferences, notificationsPerDay: 1 });
+                  } else if (num > 24) {
+                    setPreferences({ ...preferences, notificationsPerDay: 24 });
+                  } else {
                     setPreferences({ ...preferences, notificationsPerDay: num });
                   }
                 }}
@@ -990,7 +1031,7 @@ export function NotificationSettings({ userId }: NotificationSettingsProps) {
               <span className="text-sm text-muted-foreground">times per day</span>
             </div>
             <p className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800">
-              💡 <strong>1:</strong> 9 AM • <strong>2:</strong> 9 AM, 3 PM • <strong>3:</strong> 9 AM, 1 PM, 5 PM • <strong>4:</strong> 9 AM, 12 PM, 3 PM, 6 PM • <strong>5:</strong> 8 AM, 11 AM, 2 PM, 5 PM, 8 PM
+              💡 <strong>1:</strong> Daily • <strong>2:</strong> Every 12h • <strong>3:</strong> Every 8h • <strong>5:</strong> Every 5h • <strong>24:</strong> Hourly (recommended)
             </p>
           </div>
 

@@ -24,13 +24,15 @@ const lastNotificationTime = new Map<string, number>();
 class NotificationChecker {
   /**
    * Check if user should receive notification based on their frequency preference
+   * Modified to allow notifications every time items are expiring
    */
   private shouldNotifyUser(user: User): boolean {
     const userId = user.id;
-    const notificationsPerDay = parseInt(user.notificationsPerDay || "5");
+    const notificationsPerDay = parseInt(user.notificationsPerDay || "24");
     
     // Calculate minimum hours between notifications based on frequency
-    // 1 per day = 24 hours, 2 = 12 hours, 3 = 8 hours, 4 = 6 hours, 5 = 4.8 hours
+    // Default to 24 per day = hourly notifications
+    // This allows users to receive notifications every time we check
     const hoursPerNotification = 24 / notificationsPerDay;
     const minMillisecondsBetween = hoursPerNotification * 60 * 60 * 1000;
     
@@ -39,6 +41,7 @@ class NotificationChecker {
     
     if (!lastNotified) {
       // First notification, allow it
+      console.log(`[NotificationChecker] ✅ First notification for user ${user.username} - allowing`);
       return true;
     }
     
@@ -48,6 +51,8 @@ class NotificationChecker {
     if (!shouldNotify) {
       const hoursRemaining = ((minMillisecondsBetween - timeSinceLastNotification) / (1000 * 60 * 60)).toFixed(1);
       console.log(`[NotificationChecker] ⏳ User ${user.username} needs to wait ${hoursRemaining} more hours (${notificationsPerDay}x/day)`);
+    } else {
+      console.log(`[NotificationChecker] ✅ User ${user.username} frequency check passed - allowing notification`);
     }
     
     return shouldNotify;
