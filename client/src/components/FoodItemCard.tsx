@@ -40,7 +40,8 @@ export function FoodItemCard({ item, onEdit, onDelete }: FoodItemCardProps) {
     },
   };
 
-  const config = statusConfig[item.status];
+  // Get config with fallback to 'fresh' if status is undefined or invalid
+  const config = statusConfig[item.status] || statusConfig.fresh;
 
   // Get category-specific icon and color
   const getCategoryIcon = () => {
@@ -79,16 +80,16 @@ export function FoodItemCard({ item, onEdit, onDelete }: FoodItemCardProps) {
 
   return (
     <Card
-     className={`border-l-4 ${config.borderColor} hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 h-full group cursor-pointer`}
+      className={`border-l-4 ${config.borderColor} hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 h-full group cursor-pointer`}
       data-testid={`card-food-item-${item.id}`}
     >
       {/* Status Dot */}
-     <div className={`absolute top-3 right-3 h-2.5 w-2.5 rounded-full ${config.dotColor} animate-pulse`} />
+      <div className={`absolute top-3 right-3 h-2.5 w-2.5 rounded-full ${config.dotColor} animate-pulse`} />
       <CardContent className="p-5">
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-start gap-3">
-           <div className={`h-12 w-12 ${iconBgColor} rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300`}>
+            <div className={`h-12 w-12 ${iconBgColor} rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300`}>
               <CategoryIcon className={`h-6 w-6 ${iconColor}`} />
             </div>
             <div className="flex-1 min-w-0">

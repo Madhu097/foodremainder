@@ -54,7 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set cache headers for faster subsequent loads
       res.setHeader('Cache-Control', 'private, max-age=60');
-      
+
       // Fetch user and items in parallel for better performance
       const [user, items] = await Promise.all([
         storage.getUser(userId),
@@ -68,7 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate status and days left on server-side
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const itemsWithStatus = items.map(item => {
         const expiryDate = new Date(item.expiryDate);
         expiryDate.setHours(0, 0, 0, 0);
@@ -92,9 +92,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Don't send password back
       const { password, ...userWithoutPassword } = user;
 
-      res.status(200).json({ 
+      res.status(200).json({
         user: userWithoutPassword,
-        items: itemsWithStatus 
+        items: itemsWithStatus
       });
     } catch (error: any) {
       console.error("[Dashboard] Error:", error);
@@ -389,11 +389,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('ETag', `food-items-${userId}-${Date.now()}`);
 
       const items = await storage.getFoodItemsByUserId(userId);
-      
+
       // Calculate status and days left on server-side to reduce client processing
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const itemsWithStatus = items.map(item => {
         const expiryDate = new Date(item.expiryDate);
         expiryDate.setHours(0, 0, 0, 0);
@@ -654,13 +654,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manual trigger to check all users and send notifications
+  // This endpoint can be called by external cron services for serverless deployments
   app.post("/api/notifications/check-all", async (req: Request, res: Response) => {
     try {
+      // Optional API key protection for external cron services
+      const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+      const expectedApiKey = process.env.NOTIFICATION_API_KEY;
+
+      // If API key is configured, require it
+      if (expectedApiKey && apiKey !== expectedApiKey) {
+        console.error("[Notifications] ❌ Invalid or missing API key");
+        return res.status(401).json({ message: "Unauthorized: Invalid API key" });
+      }
+
+      console.log("[Notifications] 🔔 Manual notification check triggered");
       const results = await notificationChecker.checkAndNotifyAll();
+
       res.status(200).json({
         message: "Notification check completed",
         notificationsSent: results.length,
         results,
+        timestamp: new Date().toISOString(),
       });
     } catch (error) {
       console.error("[Notifications] Check all error:", error);

@@ -32,7 +32,7 @@ class TelegramService {
             this.bot.getMe().then((me) => {
                 this.botUsername = me.username || null;
                 console.log(`[TelegramService] ✅ Bot token verified: @${me.username}`);
-                
+
                 // Token is valid, start polling
                 if (this.bot) {
                     this.bot.startPolling({ restart: false });
@@ -50,7 +50,7 @@ class TelegramService {
             // Handle polling errors to prevent crash and stop on auth errors
             this.bot.on('polling_error', (error) => {
                 const errorMsg = error.message || '';
-                
+
                 // Stop polling on fatal errors
                 if (errorMsg.includes('409 Conflict')) {
                     console.error("[TelegramService] ⚠️ Conflict detected! Another instance is running. Stopping polling.");
@@ -116,35 +116,77 @@ class TelegramService {
 
     async sendExpiryNotification(user: User, expiringItems: FoodItem[]): Promise<boolean> {
         if (!this.isConfigured()) {
+            console.log('[TelegramService] Service not configured');
             return false;
         }
 
         // Check if user has a configured Telegram Chat ID
         if (!user.telegramChatId) {
-            // We can't send a message without a chat ID
+            console.log(`[TelegramService] User ${user.username} has no Telegram Chat ID`);
             return false;
         }
 
         try {
-            const itemsList = expiringItems
-                .map((item) => {
-                    const daysLeft = this.calculateDaysLeft(item.expiryDate);
-                    const statusText = daysLeft === 0 ? "expires today ⚠️" : daysLeft === 1 ? "expires tomorrow ⏰" : `expires in ${daysLeft} days`;
-                    return `• ${item.name} - ${statusText}`;
-                })
-                .join("\n");
+            console.log(`[TelegramService] Preparing notification for ${user.username}`);
+            console.log(`[TelegramService] Number of expiring items: ${expiringItems.length}`);
+            console.log(`[TelegramService] Items data:`, JSON.stringify(expiringItems, null, 2));
 
-            const message = `
-🍎 *Food Reminder Alert*
+            const itemsList = expiringItems
+                .map((item, index) => {
+                    console.log(`[TelegramService] Processing item ${index + 1}:`, {
+                        name: item.name,
+                        category: item.category,
+                        expiryDate: item.expiryDate
+                    });
+
+                    const daysLeft = this.calculateDaysLeft(item.expiryDate);
+                    const itemName = item.name || 'Unknown Item';
+                    const category = item.category ? ` (${item.category})` : '';
+
+                    let statusEmoji = '';
+                    let statusText = '';
+
+                    if (daysLeft < 0) {
+                        statusEmoji = '❌';
+                        statusText = `expired ${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? '' : 's'} ago`;
+                    } else if (daysLeft === 0) {
+                        statusEmoji = '⚠️';
+                        statusText = 'expires TODAY';
+                    } else if (daysLeft === 1) {
+                        statusEmoji = '⏰';
+                        statusText = 'expires TOMORROW';
+                    } else {
+                        statusEmoji = '⏳';
+                        statusText = `expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+                    }
+
+                    const formattedItem = `${index + 1}. ${statusEmoji} *${itemName}*${category}
+   └ ${statusText}`;
+                    console.log(`[TelegramService] Formatted item ${index + 1}: ${formattedItem}`);
+                    return formattedItem;
+                })
+                .join('\n\n');
+
+            // Get the app URL - if not set, provide helpful message
+            const appUrl = process.env.APP_URL;
+            const dashboardLink = appUrl
+                ? `
+
+[📱 Open Dashboard](${appUrl}/dashboard)`
+                : `
+
+💡 _Set APP_URL in .env to enable dashboard link_`;
+
+            const message = `🍎 *Food Reminder Alert*
 
 Hi ${user.username}! 👋
 
-You have *${expiringItems.length} item${expiringItems.length > 1 ? "s" : ""}* expiring soon:
+You have *${expiringItems.length} item${expiringItems.length > 1 ? 's' : ''}* expiring soon:
 
-${itemsList}
+${itemsList}${dashboardLink}`.trim();
 
-[View Dashboard](${process.env.APP_URL || "http://localhost:5000"}/dashboard)
-      `.trim();
+            console.log(`[TelegramService] Final message to send:\n${message}`);
+            console.log(`[TelegramService] Sending to chat ID: ${user.telegramChatId}`);
 
             await this.bot!.sendMessage(user.telegramChatId, message, {
                 parse_mode: 'Markdown',
@@ -154,7 +196,11 @@ ${itemsList}
             console.log(`[TelegramService] ✅ Telegram notification sent to ${user.username}`);
             return true;
         } catch (error) {
-            console.error("[TelegramService] ❌ Failed to send Telegram message:", error);
+            console.error(`[TelegramService] ❌ Failed to send Telegram message:`, error);
+            if (error instanceof Error) {
+                console.error(`[TelegramService] Error message: ${error.message}`);
+                console.error(`[TelegramService] Error stack: ${error.stack}`);
+            }
             return false;
         }
     }

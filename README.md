@@ -147,6 +147,8 @@ TIMEZONE=UTC
 
 | Document | Description |
 |----------|-------------|
+| **[NOTIFICATION_SETUP.md](./NOTIFICATION_SETUP.md)** | **🔔 Complete automatic notification setup (5x/day)** |
+| **[NOTIFICATION_TROUBLESHOOTING.md](./NOTIFICATION_TROUBLESHOOTING.md)** | **🔧 Fix notification issues** |
 | **[NOTIFICATIONS_QUICKSTART.md](./NOTIFICATIONS_QUICKSTART.md)** | **⚡ 3-min notification setup** |
 | [COMPLETE_NOTIFICATION_GUIDE.md](./COMPLETE_NOTIFICATION_GUIDE.md) | Complete notification reference |
 | **[TELEGRAM_SETUP_GUIDE.md](./TELEGRAM_SETUP_GUIDE.md)** | **✈️ Telegram setup guide** |
