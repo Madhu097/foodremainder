@@ -1,0 +1,82 @@
+﻿[dotenv@17.2.3] injecting env (16) from .env -- tip: ≡ƒùé∩╕Å backup and recover secrets: https://dotenvx.com/ops
+≡ƒöì NOTIFICATION SYSTEM DIAGNOSTIC
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+≡ƒôï 1. CHECKING ENVIRONMENT VARIABLES:
+
+Required (Firebase):
+  Γ£à FIREBASE_PROJECT_ID: food-remainder...
+  Γ£à FIREBASE_CLIENT_EMAIL: firebase-adminsdk-fb...
+  Γ£à FIREBASE_PRIVATE_KEY: Γ£à Set
+
+Optional (Notification Services):
+  Γ£à TELEGRAM_BOT_TOKEN: 8545367968:AAGQfRkjBG3Fhr4MmLg...
+  Γ£à RESEND_API_KEY: re_NDdfnqfY_CJPLfEnKFib7DQkegM...
+  Γ£à EMAIL_SERVICE: resend
+  Γ£à EMAIL_FROM: Food Reminder <onboarding@rese...
+  Γ£à TWILIO_ACCOUNT_SID: AC4982747c7945b9e97c0333f9b3d3...
+  Γ£à TWILIO_AUTH_TOKEN: f2b3526989b57085a9557a984528a1...
+  Γ£à APP_URL: https://foodreminder.vercel.ap...
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+≡ƒôà 2. VERCEL CRON CONFIGURATION:
+
+Γ£à Vercel cron jobs configured:
+
+  Cron Job 1:
+    Path: /api/cron/check-notifications
+    Schedule: 0 8,11,14,17,20 * * *
+    Times (UTC): 8:00 UTC, 11:00 UTC, 14:00 UTC, 17:00 UTC, 20:00 UTC
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+ΓÅ░ 3. NOTIFICATION SCHEDULER SETTINGS:
+
+  Auto Schedule: true
+  Test Mode: true
+  Custom Schedule: */5 * * * *
+  Timezone: Asia/Kolkata
+  API Key Set: Γ£à Yes
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+≡ƒº¬ 4. TESTING NOTIFICATION SYSTEM:
+
+  App URL: https://foodreminder.vercel.app
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+≡ƒöº 5. COMMON ISSUES & SOLUTIONS:
+
+  Γ£à No obvious configuration issues found!
+
+  If notifications still aren't working, check:
+     1. Vercel deployment logs
+     2. User notification preferences in the app
+     3. Whether users have expiring items
+     4. Vercel cron job execution logs
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+≡ƒô¥ 6. NEXT STEPS:
+
+  To fix notifications, do the following:
+
+  1∩╕ÅΓâú  Ensure all environment variables are set in Vercel
+     - Go to Vercel Dashboard ΓåÆ Your Project ΓåÆ Settings ΓåÆ Environment Variables
+     - Add all variables from your .env file
+
+  2∩╕ÅΓâú  Verify Vercel Cron is enabled
+     - Go to Vercel Dashboard ΓåÆ Your Project ΓåÆ Settings ΓåÆ Cron Jobs
+     - You should see: /api/cron/check-notifications
+
+  3∩╕ÅΓâú  Check Vercel Function Logs
+     - Go to Vercel Dashboard ΓåÆ Your Project ΓåÆ Deployments
+     - Click latest deployment ΓåÆ Functions tab
+     - Look for /api/cron/check-notifications logs
+
+  4∩╕ÅΓâú  Test manually
+     curl "https://foodreminder.vercel.app/api/cron/check-notifications"
+
+  5∩╕ÅΓâú  Check user settings in the app
+     - Users must enable notification channels
+     - Users must have food items expiring soon
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+

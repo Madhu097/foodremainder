@@ -1,22 +1,32 @@
 {
+  "version": 2,
   "crons": [
     {
-      "path": "/api/cron/check-notifications",
+      "path": "/api/notifications/check-all",
       "schedule": "0 8,11,14,17,20 * * *"
     }
   ],
-  "rewrites": [
+  "builds": [
     {
-      "source": "/((?!api).*)",
-      "destination": "/index.html"
+      "src": "api/index.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist/public"
+      }
     }
   ],
-  "functions": {
-    "api/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 60
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/public/$1"
     }
-  },
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist/public"
+  ]
 }
