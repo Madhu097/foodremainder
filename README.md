@@ -21,6 +21,16 @@ A smart food inventory management system that helps you track expiry dates and p
 
 ---
 
+## ⚠️ IMPORTANT: Automatic Notifications Setup
+
+**If notifications are not being sent regularly**, this is because Vercel is a serverless platform and doesn't run background processes.
+
+**Quick Fix (5 minutes):** See **[QUICK_FIX.md](./QUICK_FIX.md)** to set up automatic notifications using a free external cron service.
+
+**Detailed Guide:** See **[SETUP_AUTOMATIC_NOTIFICATIONS.md](./SETUP_AUTOMATIC_NOTIFICATIONS.md)** for complete instructions.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -147,6 +157,8 @@ TIMEZONE=UTC
 
 | Document | Description |
 |----------|-------------|
+| **[QUICK_FIX.md](./QUICK_FIX.md)** | **⚡ 5-minute fix for automatic notifications** |
+| **[SETUP_AUTOMATIC_NOTIFICATIONS.md](./SETUP_AUTOMATIC_NOTIFICATIONS.md)** | **🔧 Complete automatic notification setup** |
 | **[NOTIFICATION_SETUP.md](./NOTIFICATION_SETUP.md)** | **🔔 Complete automatic notification setup (5x/day)** |
 | **[NOTIFICATION_TROUBLESHOOTING.md](./NOTIFICATION_TROUBLESHOOTING.md)** | **🔧 Fix notification issues** |
 | **[NOTIFICATIONS_QUICKSTART.md](./NOTIFICATIONS_QUICKSTART.md)** | **⚡ 3-min notification setup** |
@@ -158,6 +170,7 @@ TIMEZONE=UTC
 | [DATA_STORAGE_GUIDE.md](./DATA_STORAGE_GUIDE.md) | Understanding data storage |
 | [HOW_TO_RUN.md](./HOW_TO_RUN.md) | Detailed running instructions |
 | [USER_GUIDE.md](./USER_GUIDE.md) | User manual |
+
 
 ---
 
