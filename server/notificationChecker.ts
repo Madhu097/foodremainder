@@ -18,51 +18,56 @@ interface NotificationResult {
   pushSent: boolean;
 }
 
-// Track last notification time for each user
-const lastNotificationTime = new Map<string, number>();
-
 class NotificationChecker {
   /**
    * Check if user should receive notification based on their frequency preference
-   * Modified to allow notifications every time items are expiring
+   * Modified to use persistent storage
    */
   private shouldNotifyUser(user: User): boolean {
-    const userId = user.id;
     const notificationsPerDay = parseInt(user.notificationsPerDay || "24");
-    
+
     // Calculate minimum hours between notifications based on frequency
-    // Default to 24 per day = hourly notifications
-    // This allows users to receive notifications every time we check
     const hoursPerNotification = 24 / notificationsPerDay;
     const minMillisecondsBetween = hoursPerNotification * 60 * 60 * 1000;
-    
-    const lastNotified = lastNotificationTime.get(userId);
+
+    // Check persistent storage timestamp
+    const lastNotifiedStr = user.lastNotificationSentAt;
     const now = Date.now();
-    
-    if (!lastNotified) {
+
+    if (!lastNotifiedStr) {
       // First notification, allow it
       console.log(`[NotificationChecker] ✅ First notification for user ${user.username} - allowing`);
       return true;
     }
-    
+
+    const lastNotified = new Date(lastNotifiedStr).getTime();
+    if (isNaN(lastNotified)) {
+      // Invalid date string, treat as never notified
+      return true;
+    }
+
     const timeSinceLastNotification = now - lastNotified;
     const shouldNotify = timeSinceLastNotification >= minMillisecondsBetween;
-    
+
     if (!shouldNotify) {
       const hoursRemaining = ((minMillisecondsBetween - timeSinceLastNotification) / (1000 * 60 * 60)).toFixed(1);
       console.log(`[NotificationChecker] ⏳ User ${user.username} needs to wait ${hoursRemaining} more hours (${notificationsPerDay}x/day)`);
     } else {
       console.log(`[NotificationChecker] ✅ User ${user.username} frequency check passed - allowing notification`);
     }
-    
+
     return shouldNotify;
   }
-  
+
   /**
    * Record that a notification was sent to a user
    */
-  private recordNotification(userId: string): void {
-    lastNotificationTime.set(userId, Date.now());
+  private async recordNotification(userId: string): Promise<void> {
+    try {
+      await storage.updateLastNotificationTime(userId);
+    } catch (error) {
+      console.error(`[NotificationChecker] Failed to record notification time for ${userId}:`, error);
+    }
   }
 
   /**
@@ -178,7 +183,7 @@ class NotificationChecker {
       console.log(`[NotificationChecker] ⏭️ Skipping notification for user ${user.username} due to frequency preference`);
       return null;
     }
-    
+
     // Check quiet hours (skip if override provided - i.e. test mode)
     if (!itemsOverride && this.isInQuietHours(user)) {
       console.log(`[NotificationChecker] Skipping notification for user ${user.username} due to quiet hours`);
@@ -301,7 +306,7 @@ class NotificationChecker {
 
     // Record that notification was sent (even if only some channels succeeded)
     if (result.emailSent || result.whatsappSent || result.smsSent || result.telegramSent || result.pushSent) {
-      this.recordNotification(user.id);
+      await this.recordNotification(user.id);
       console.log(`[NotificationChecker] ✅ Notification sent to ${user.username}, recorded for frequency tracking`);
     }
 

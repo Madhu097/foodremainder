@@ -19,6 +19,7 @@ export interface User {
   smsNotifications: string;
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
+  lastNotificationSentAt: string | null;
   createdAt: string;
 }
 

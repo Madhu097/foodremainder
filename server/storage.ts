@@ -16,6 +16,7 @@ export interface IStorage {
   updateUserPassword(userId: string, newPasswordHash: string): Promise<boolean>;
   updateUserProfile(userId: string, profile: { username?: string; email?: string; profilePicture?: string }): Promise<boolean>;
   updateNotificationPreferences(userId: string, preferences: Partial<Pick<User, 'emailNotifications' | 'whatsappNotifications' | 'telegramNotifications' | 'telegramChatId' | 'notificationDays' | 'notificationsPerDay' | 'browserNotifications' | 'quietHoursStart' | 'quietHoursEnd'>>): Promise<boolean>;
+  updateLastNotificationTime(userId: string): Promise<boolean>;
   addPushSubscription(userId: string, subscription: string): Promise<boolean>;
   deleteUser(userId: string): Promise<boolean>;
 
@@ -87,6 +88,7 @@ export class MemStorage implements IStorage {
       browserNotifications: "false",
       quietHoursStart: null,
       quietHoursEnd: null,
+      lastNotificationSentAt: null,
       createdAt: new Date().toISOString(),
     };
     this.users.set(id, user);
@@ -143,6 +145,14 @@ export class MemStorage implements IStorage {
       user.pushSubscriptions.push(subscription);
     }
 
+    this.users.set(userId, user);
+    return true;
+  }
+
+  async updateLastNotificationTime(userId: string): Promise<boolean> {
+    const user = this.users.get(userId);
+    if (!user) return false;
+    user.lastNotificationSentAt = new Date().toISOString();
     this.users.set(userId, user);
     return true;
   }

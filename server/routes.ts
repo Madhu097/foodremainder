@@ -662,14 +662,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      // Optional API key protection for external cron services
+      console.log(`[Notifications] 🔔 Check-all triggered. Method: ${req.method}`);
+
+      // Authentication Logic
+      const authHeader = req.headers.authorization;
+      const cronSecret = process.env.CRON_SECRET;
+
       const apiKey = req.headers['x-api-key'] || req.query.apiKey;
       const expectedApiKey = process.env.NOTIFICATION_API_KEY;
 
-      // If API key is configured, require it
-      if (expectedApiKey && apiKey !== expectedApiKey) {
-        console.error("[Notifications] ❌ Invalid or missing API key");
-        return res.status(401).json({ message: "Unauthorized: Invalid API key" });
+      let authorized = false;
+
+      // 1. Check Vercel Cron Secret (Standard Vercel Cron)
+      if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+        console.log("[Notifications] ✅ Authorized via Vercel Cron Secret");
+        authorized = true;
+      }
+      // 2. Check API Key (Manual invocation)
+      else if (expectedApiKey && apiKey === expectedApiKey) {
+        console.log("[Notifications] ✅ Authorized via API Key");
+        authorized = true;
+      }
+      // 3. If neither secret is configured on the server, allow (but warn)
+      // This ensures functionality doesn't break if user hasn't set up secrets yet
+      else if (!cronSecret && !expectedApiKey) {
+        console.log("[Notifications] ⚠️ No secrets configured - allowing request (INSECURE)");
+        authorized = true;
+      }
+
+      if (!authorized) {
+        console.error("[Notifications] ❌ Unauthorized access attempt");
+        return res.status(401).json({
+          message: "Unauthorized",
+          detail: "Configure CRON_SECRET or NOTIFICATION_API_KEY"
+        });
       }
 
       console.log("[Notifications] 🔔 Manual notification check triggered");

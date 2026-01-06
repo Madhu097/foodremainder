@@ -221,6 +221,7 @@ export class FirebaseStorage implements IStorage {
             browserNotifications: "false",
             quietHoursStart: null,
             quietHoursEnd: null,
+            lastNotificationSentAt: null,
             createdAt: new Date().toISOString(),
         };
 
@@ -268,6 +269,25 @@ export class FirebaseStorage implements IStorage {
 
             return true;
         } catch (error) {
+            return false;
+        }
+    }
+
+    async updateLastNotificationTime(userId: string): Promise<boolean> {
+        if (!db) throw new Error("Firestore not initialized");
+        try {
+            const now = new Date().toISOString();
+            await db.collection('users').doc(userId).update({
+                lastNotificationSentAt: now
+            });
+
+            // Invalidate user cache
+            this.userCache.invalidate(userId);
+            this.allUsersCache.clear();
+
+            return true;
+        } catch (error) {
+            console.error(`[FirebaseStorage] Failed to update notification time for user: ${userId}`, error);
             return false;
         }
     }
