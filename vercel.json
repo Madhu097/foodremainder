@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/notifications/check-all",
-      "schedule": "0 8,11,14,17,20 * * *"
+      "schedule": "* * * * *"
     }
   ],
   "builds": [
