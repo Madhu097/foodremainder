@@ -76,6 +76,8 @@ class NotificationChecker {
   async checkAndNotifyAll(): Promise<NotificationResult[]> {
     console.log("[NotificationChecker] ========================================");
     console.log("[NotificationChecker] 🔔 Starting notification check for all users...");
+    console.log("[NotificationChecker] Timestamp:", new Date().toISOString());
+    console.log("[NotificationChecker] Timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
     console.log("[NotificationChecker] ========================================");
 
     const results: NotificationResult[] = [];
@@ -92,6 +94,7 @@ class NotificationChecker {
 
       if (totalUsers === 0) {
         console.log("[NotificationChecker] ⚠️ No users found in database");
+        console.log("[NotificationChecker] ⚠️ This might indicate a database connection issue");
         return results;
       }
 
@@ -225,10 +228,16 @@ class NotificationChecker {
     }
 
     if (expiringItems.length === 0) {
+      console.log(`[NotificationChecker] ℹ️ No expiring items for ${user.username} (threshold: ${notificationDays} days)`);
       return null;
     }
 
-    console.log(`[NotificationChecker] User ${user.username} has ${expiringItems.length} expiring items`);
+    console.log(`[NotificationChecker] 🎯 User ${user.username} has ${expiringItems.length} expiring items`);
+    expiringItems.forEach(item => {
+      const expiryDate = new Date(item.expiryDate);
+      const daysLeft = Math.ceil((expiryDate.getTime() - new Date().setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24));
+      console.log(`[NotificationChecker]    - ${item.name}: expires in ${daysLeft} days`);
+    });
 
     const result: NotificationResult = {
       userId: user.id,

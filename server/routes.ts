@@ -662,7 +662,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      console.log(`[Notifications] ========================================`);
       console.log(`[Notifications] 🔔 Check-all triggered. Method: ${req.method}`);
+      console.log(`[Notifications] Time: ${new Date().toISOString()}`);
+      console.log(`[Notifications] Headers:`, JSON.stringify(req.headers, null, 2));
+      console.log(`[Notifications] Query:`, JSON.stringify(req.query, null, 2));
+      console.log(`[Notifications] ========================================`);
 
       // Authentication Logic
       const authHeader = req.headers.authorization;
@@ -671,45 +676,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = req.headers['x-api-key'] || req.query.apiKey;
       const expectedApiKey = process.env.NOTIFICATION_API_KEY;
 
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+
       let authorized = false;
+      let authMethod = 'none';
 
       // 1. Check Vercel Cron Secret (Standard Vercel Cron)
       if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
         console.log("[Notifications] ✅ Authorized via Vercel Cron Secret");
         authorized = true;
+        authMethod = 'vercel-cron';
       }
       // 2. Check API Key (Manual invocation)
       else if (expectedApiKey && apiKey === expectedApiKey) {
         console.log("[Notifications] ✅ Authorized via API Key");
         authorized = true;
+        authMethod = 'api-key';
       }
-      // 3. If neither secret is configured on the server, allow (but warn)
-      // This ensures functionality doesn't break if user hasn't set up secrets yet
+      // 3. Development mode - allow without auth (but warn)
+      else if (isDevelopment) {
+        console.log("[Notifications] ⚠️ Development mode - allowing request without authentication");
+        console.log("[Notifications] 💡 In production, set CRON_SECRET or NOTIFICATION_API_KEY");
+        authorized = true;
+        authMethod = 'dev-mode';
+      }
+      // 4. If neither secret is configured on the server, allow (but warn)
       else if (!cronSecret && !expectedApiKey) {
         console.log("[Notifications] ⚠️ No secrets configured - allowing request (INSECURE)");
+        console.log("[Notifications] 💡 Set CRON_SECRET or NOTIFICATION_API_KEY environment variable");
         authorized = true;
+        authMethod = 'no-auth';
       }
 
       if (!authorized) {
         console.error("[Notifications] ❌ Unauthorized access attempt");
+        console.error("[Notifications] Expected CRON_SECRET:", cronSecret ? 'SET' : 'NOT SET');
+        console.error("[Notifications] Expected NOTIFICATION_API_KEY:", expectedApiKey ? 'SET' : 'NOT SET');
+        console.error("[Notifications] Received Authorization:", authHeader ? 'PROVIDED' : 'MISSING');
+        console.error("[Notifications] Received API Key:", apiKey ? 'PROVIDED' : 'MISSING');
         return res.status(401).json({
           message: "Unauthorized",
-          detail: "Configure CRON_SECRET or NOTIFICATION_API_KEY"
+          detail: "Set CRON_SECRET or NOTIFICATION_API_KEY, or ensure NODE_ENV is not 'production'"
         });
       }
 
-      console.log("[Notifications] 🔔 Manual notification check triggered");
+      console.log("[Notifications] 🔔 Starting notification check...");
+      const startTime = Date.now();
       const results = await notificationChecker.checkAndNotifyAll();
+      const duration = Date.now() - startTime;
+
+      console.log(`[Notifications] ✅ Check completed in ${duration}ms`);
 
       res.status(200).json({
+        success: true,
         message: "Notification check completed",
         notificationsSent: results.length,
         results,
+        authMethod,
+        duration: `${duration}ms`,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error("[Notifications] Check all error:", error);
-      res.status(500).json({ message: "Failed to check notifications" });
+      console.error("[Notifications] ❌ Check all error:", error);
+      console.error("[Notifications] Stack trace:", error instanceof Error ? error.stack : 'No stack');
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to check notifications",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

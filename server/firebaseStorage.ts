@@ -215,7 +215,7 @@ export class FirebaseStorage implements IStorage {
             telegramNotifications: "false",
             telegramChatId: null,
             notificationDays: "3",
-            notificationsPerDay: "1",
+            notificationsPerDay: "4",
             pushSubscriptions: [],
             profilePicture: "default",
             browserNotifications: "false",
