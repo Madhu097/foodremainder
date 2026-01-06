@@ -655,7 +655,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Manual trigger to check all users and send notifications
   // This endpoint can be called by external cron services for serverless deployments
-  app.post("/api/notifications/check-all", async (req: Request, res: Response) => {
+  // Changed to use (GET/POST) as Vercel Cron uses GET
+  app.use("/api/notifications/check-all", async (req: Request, res: Response) => {
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      return res.status(405).json({ message: "Method Not Allowed" });
+    }
+
     try {
       // Optional API key protection for external cron services
       const apiKey = req.headers['x-api-key'] || req.query.apiKey;
