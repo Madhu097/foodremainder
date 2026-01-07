@@ -34,7 +34,12 @@ class NotificationChecker {
     const lastNotifiedStr = user.lastNotificationSentAt;
     const now = Date.now();
 
-    if (!lastNotifiedStr) {
+    console.log(`[NotificationChecker] 🔍 Frequency check for ${user.username}:`);
+    console.log(`[NotificationChecker]    Notifications per day: ${notificationsPerDay}`);
+    console.log(`[NotificationChecker]    Hours between notifications: ${hoursPerNotification.toFixed(2)}`);
+    console.log(`[NotificationChecker]    Last notification: ${lastNotifiedStr || 'NEVER'}`);
+
+    if (!lastNotifiedStr || lastNotifiedStr === 'null' || lastNotifiedStr === '') {
       // First notification, allow it
       console.log(`[NotificationChecker] ✅ First notification for user ${user.username} - allowing`);
       return true;
@@ -43,15 +48,21 @@ class NotificationChecker {
     const lastNotified = new Date(lastNotifiedStr).getTime();
     if (isNaN(lastNotified)) {
       // Invalid date string, treat as never notified
+      console.log(`[NotificationChecker] ⚠️ Invalid lastNotificationSentAt timestamp for ${user.username}: "${lastNotifiedStr}" - allowing notification`);
       return true;
     }
 
     const timeSinceLastNotification = now - lastNotified;
+    const hoursSinceLastNotification = (timeSinceLastNotification / (1000 * 60 * 60)).toFixed(2);
     const shouldNotify = timeSinceLastNotification >= minMillisecondsBetween;
 
+    console.log(`[NotificationChecker]    Time since last notification: ${hoursSinceLastNotification} hours`);
+    console.log(`[NotificationChecker]    Minimum required: ${hoursPerNotification.toFixed(2)} hours`);
+
     if (!shouldNotify) {
-      const hoursRemaining = ((minMillisecondsBetween - timeSinceLastNotification) / (1000 * 60 * 60)).toFixed(1);
+      const hoursRemaining = ((minMillisecondsBetween - timeSinceLastNotification) / (1000 * 60 * 60)).toFixed(2);
       console.log(`[NotificationChecker] ⏳ User ${user.username} needs to wait ${hoursRemaining} more hours (${notificationsPerDay}x/day)`);
+      console.log(`[NotificationChecker]    Next notification allowed at: ${new Date(lastNotified + minMillisecondsBetween).toISOString()}`);
     } else {
       console.log(`[NotificationChecker] ✅ User ${user.username} frequency check passed - allowing notification`);
     }

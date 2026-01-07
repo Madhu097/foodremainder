@@ -1,228 +1,213 @@
 # Notification System Debugging Guide
 
-## Overview
-This guide helps you test and debug the automatic expiry notification system.
+## Problem: Users Not Receiving Automatic Expiry Alerts
 
-## Quick Test
+This guide helps you debug and fix issues with automatic expiry notifications.
 
-### 1. Test Notifications Manually
-You can trigger notifications manually via the API:
+## Quick Diagnosis
+
+### 1. Check if the Cron Job is Running
+
+The Vercel cron job should run **every hour** (configured in `vercel.json`).
+
+To verify:
+1. Go to your Vercel dashboard
+2. Navigate to your project → Settings → Cron Jobs
+3. Check the "Last Run" timestamp
+4. Check the logs for any errors
+
+### 2. Test the Notification Endpoint Manually
+
+Run this command to test the notification check:
 
 ```bash
-# Using curl (replace with your actual API URL and key)
-curl -X POST https://your-app.vercel.app/api/notifications/check-all \
-  -H "x-api-key: YOUR_NOTIFICATION_API_KEY"
+# For local development
+API_URL=http://localhost:5000 NOTIFICATION_API_KEY=your-key node test-notification-check.js
 
-# Or with authorization header
-curl -X POST https://your-app.vercel.app/api/notifications/check-all \
-  -H "Authorization: Bearer YOUR_CRON_SECRET"
-
-# For local testing (no auth needed if not configured)
-curl http://localhost:5000/api/notifications/check-all
+# For production
+API_URL=https://your-app.vercel.app NOTIFICATION_API_KEY=your-key node test-notification-check.js
 ```
 
-### 2. Test Single User Notification
-```bash
-curl -X POST http://localhost:5000/api/notifications/test/:userId
-```
+### 3. Check User Settings
 
-## Vercel Cron Configuration
+Users must have:
+- ✅ At least one notification channel enabled (Email, WhatsApp, Telegram, or Browser)
+- ✅ Food items that are expiring within their notification threshold (default: 3 days)
+- ✅ Not in quiet hours
+- ✅ Enough time passed since last notification (based on frequency preference)
 
-The cron job is configured in `vercel.json`:
-```json
-{
-  "crons": [{
-    "path": "/api/notifications/check-all",
-    "schedule": "0 */2 * * *"  // Every 2 hours
-  }]
-}
-```
+## Common Issues and Solutions
 
-**Current Schedule:** Every 2 hours at :00 minutes
+### Issue 1: Notifications Only Work with Test Button
+
+**Symptom**: Test notifications work, but automatic notifications don't arrive.
+
+**Cause**: The frequency limiter prevents notifications if they were sent recently.
+
+**Solution**: 
+1. Check the `lastNotificationSentAt` field in the database
+2. Verify the user's `notificationsPerDay` setting
+3. Calculate if enough time has passed: `24 hours / notificationsPerDay`
+
+### Issue 2: Cron Job Not Triggering
+
+**Symptom**: No logs in Vercel, no notifications sent.
+
+**Causes**:
+- Cron job not configured in Vercel dashboard
+- `CRON_SECRET` environment variable not set
+- Vercel plan doesn't support cron jobs (requires Pro plan)
+
+**Solution**:
+1. Verify cron job is enabled in Vercel dashboard
+2. Set `CRON_SECRET` environment variable in Vercel
+3. Check your Vercel plan supports cron jobs
+
+### Issue 3: Authentication Failures
+
+**Symptom**: Cron endpoint returns 401 Unauthorized.
+
+**Solution**:
+Set one of these environment variables in Vercel:
+- `CRON_SECRET` - for Vercel cron jobs
+- `NOTIFICATION_API_KEY` - for manual API calls
+
+### Issue 4: No Expiring Items
+
+**Symptom**: Logs show "No expiring items" for all users.
+
+**Solution**:
+1. Check if users have added food items
+2. Verify expiry dates are within the notification threshold
+3. Check the `notificationDays` setting (default: 3 days)
 
 ## Environment Variables Required
 
-### For Vercel Deployment
-Add these to your Vercel project settings:
+### For Vercel Deployment:
 
-```bash
-# Cron authentication
-CRON_SECRET=your-secret-here
-# OR
-NOTIFICATION_API_KEY=your-api-key-here
+```env
+# Authentication (choose one)
+CRON_SECRET=your-vercel-cron-secret
+NOTIFICATION_API_KEY=your-api-key
 
-# Email service (choose one)
-RESEND_API_KEY=re_xxxxx
-# OR for other email services
-EMAIL_SERVICE=smtp
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-EMAIL_FROM=Your Name <your-email@gmail.com>
+# Firebase (required)
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_PRIVATE_KEY=your-private-key
+FIREBASE_CLIENT_EMAIL=your-client-email
 
-# WhatsApp (optional - Twilio)
-TWILIO_ACCOUNT_SID=ACxxxx
-TWILIO_AUTH_TOKEN=xxxx
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+# Email Service (optional)
+RESEND_API_KEY=your-resend-key
 
 # Telegram (optional)
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+TELEGRAM_BOT_TOKEN=your-bot-token
+
+# WhatsApp Cloud API (optional)
+WHATSAPP_CLOUD_PHONE_NUMBER_ID=your-phone-id
+WHATSAPP_CLOUD_ACCESS_TOKEN=your-access-token
 
 # Push Notifications (optional)
-VAPID_PUBLIC_KEY=xxxx
-VAPID_PRIVATE_KEY=xxxx
-VAPID_SUBJECT=mailto:your-email@example.com
-
-# Firebase
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk@your-project.iam.gserviceaccount.com
+VAPID_PUBLIC_KEY=your-public-key
+VAPID_PRIVATE_KEY=your-private-key
 ```
 
-## Common Issues & Solutions
+## Debugging Steps
 
-### Issue 1: Cron Not Running
-**Symptoms:** No notifications being sent automatically
+### Step 1: Enable Detailed Logging
 
-**Check:**
-1. Verify cron is enabled in Vercel dashboard
-2. Check Vercel function logs for errors
-3. Ensure `CRON_SECRET` is set in Vercel environment variables
+The notification checker now includes detailed logging. Check your Vercel logs for:
 
-**Solution:**
-- Go to Vercel Dashboard → Your Project → Settings → Environment Variables
-- Add `CRON_SECRET` with a secure random string
-- Redeploy your app
+```
+[NotificationChecker] 🔍 Frequency check for [username]:
+[NotificationChecker]    Notifications per day: 24
+[NotificationChecker]    Hours between notifications: 1.00
+[NotificationChecker]    Last notification: 2026-01-07T12:00:00.000Z
+[NotificationChecker]    Time since last notification: 0.75 hours
+[NotificationChecker]    Minimum required: 1.00 hours
+[NotificationChecker] ⏳ User [username] needs to wait 0.25 more hours
+```
 
-### Issue 2: No Users Receiving Notifications
-**Symptoms:** Cron runs but no notifications sent
+### Step 2: Check Database
 
-**Check:**
-1. Verify users have notification channels enabled (email, WhatsApp, etc.)
-2. Check if users have expiring items within the notification threshold
-3. Verify notification frequency settings
+Verify these fields in your Firebase users collection:
 
-**Debug Command:**
+```javascript
+{
+  "emailNotifications": "true",  // or "false"
+  "whatsappNotifications": "true",
+  "telegramNotifications": "true",
+  "browserNotifications": "true",
+  "notificationDays": "3",  // days before expiry to notify
+  "notificationsPerDay": "24",  // how many times per day
+  "lastNotificationSentAt": "2026-01-07T12:00:00.000Z",  // last notification time
+  "quietHoursStart": null,  // e.g., "22:00"
+  "quietHoursEnd": null  // e.g., "07:00"
+}
+```
+
+### Step 3: Test Individual User
+
+Use the test notification endpoint:
+
 ```bash
-# Check logs in Vercel
-vercel logs your-app-name --follow
-
-# Or check via API response
-curl -X POST https://your-app.vercel.app/api/notifications/check-all \
-  -H "x-api-key: YOUR_KEY" | jq
+curl -X POST https://your-app.vercel.app/api/notifications/test/USER_ID
 ```
 
-### Issue 3: Notifications Too Infrequent
-**Symptoms:** Users complaining they don't get timely notifications
+This bypasses frequency limits and quiet hours.
 
-**Solution:**
-1. Users can adjust their notification frequency in Profile → Notification Settings
-2. Default is 4 times per day (every 6 hours)
-3. Users can increase to 24 times (hourly) for urgent items
+### Step 4: Monitor Cron Execution
 
-### Issue 4: Email Service Not Working
-**Symptoms:** Email notifications failing
+Check Vercel logs after each cron run:
 
-**Check:**
-1. Verify `RESEND_API_KEY` is set correctly
-2. Check email service logs
-3. Verify sender email is verified in Resend
+1. Go to Vercel Dashboard → Your Project → Logs
+2. Filter by "cron" or search for "[NotificationChecker]"
+3. Look for errors or skipped users
 
-**Test:**
-```bash
-# Check service configuration
-curl http://localhost:5000/api/health | jq .services.email
-```
+## Expected Behavior
 
-### Issue 5: WhatsApp Not Working
-**Symptoms:** WhatsApp notifications failing
+### Hourly Cron Job
 
-**Common Causes:**
-1. User hasn't joined Twilio sandbox
-2. Mobile number format incorrect
-3. Twilio credentials not configured
+- Runs every hour at minute 0 (e.g., 1:00, 2:00, 3:00)
+- Checks all users in the database
+- For each user:
+  1. Checks if they have expiring items
+  2. Checks if notifications are enabled
+  3. Checks if they're in quiet hours
+  4. Checks if enough time has passed since last notification
+  5. Sends notifications via enabled channels
+  6. Records the notification time
 
-**Solution:**
-- Users must send "join <your-sandbox-keyword>" to Twilio's WhatsApp number
-- Ensure mobile numbers include country code (e.g., +91 for India)
-- Verify `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_WHATSAPP_FROM` are set
+### Notification Frequency
 
-## Monitoring Notifications
+If a user sets `notificationsPerDay` to:
+- **1**: Notifications sent once per day (every 24 hours)
+- **2**: Notifications sent twice per day (every 12 hours)
+- **3**: Notifications sent 3 times per day (every 8 hours)
+- **24**: Notifications sent every hour
 
-### View Logs
-```bash
-# Vercel logs
-vercel logs --follow
+## Testing Checklist
 
-# Local development logs
-npm run dev
-# Then trigger: curl http://localhost:5000/api/notifications/check-all
-```
+- [ ] Cron job is configured in Vercel
+- [ ] Environment variables are set
+- [ ] At least one user has notifications enabled
+- [ ] User has food items expiring within threshold
+- [ ] User is not in quiet hours
+- [ ] Enough time has passed since last notification
+- [ ] Notification services are configured (Email, Telegram, etc.)
+- [ ] Manual test endpoint works
+- [ ] Vercel logs show cron execution
 
-### Check Notification History
-Users' last notification time is tracked in the database:
-- Field: `lastNotificationSentAt`
-- This ensures frequency preferences are respected
+## Need More Help?
 
-## Testing Locally
+1. Check Vercel logs for detailed error messages
+2. Run the test script: `node test-notification-check.js`
+3. Verify all environment variables are set correctly
+4. Check Firebase console for user data
+5. Test individual notification channels separately
 
-1. Start the dev server:
-```bash
-npm run dev
-```
+## Recent Changes
 
-2. The notification scheduler starts automatically (every 5 minutes in test mode)
-
-3. Or trigger manually:
-```bash
-curl -X POST http://localhost:5000/api/notifications/check-all
-```
-
-4. To test a specific user:
-```bash
-curl -X POST http://localhost:5000/api/notifications/test/:userId
-```
-
-## Notification Flow
-
-1. **Cron Trigger** (every 2 hours on Vercel)
-   ↓
-2. **Calls** `/api/notifications/check-all`
-   ↓
-3. **For Each User:**
-   - Check if notification frequency allows sending
-   - Check if in quiet hours
-   - Check if any notification channels enabled
-   - Get user's food items
-   - Filter items expiring within threshold (default: 3 days)
-   - Send notifications via enabled channels
-   - Update lastNotificationSentAt
-   ↓
-4. **Return Results** (success/failure per user)
-
-## Default Settings for New Users
-
-When a user registers, they get these defaults:
-- Email notifications: **Enabled**
-- WhatsApp notifications: **Disabled** (must enable and join sandbox)
-- SMS notifications: **Disabled**
-- Telegram notifications: **Disabled**
-- Browser push: **Disabled**
-- Notification threshold: **3 days** before expiry
-- Notification frequency: **4 times per day** (every 6 hours)
-- Quiet hours: **None**
-
-Users can customize all these in Profile → Notification Settings.
-
-## Need Help?
-
-If notifications still aren't working:
-
-1. Check all logs thoroughly
-2. Verify all environment variables are set
-3. Test each notification service individually
-4. Ensure at least one notification channel is enabled per user
-5. Verify users have items expiring within the notification threshold
-
-For more help, check the console logs or contact support.
+### 2026-01-07
+- ✅ Enhanced frequency checking with detailed logging
+- ✅ Changed cron schedule from every 2 hours to every hour
+- ✅ Added better handling of null/invalid timestamps
+- ✅ Added diagnostic logging for debugging
