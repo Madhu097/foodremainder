@@ -458,6 +458,7 @@ export class FirebaseStorage implements IStorage {
             userId,
             quantity: insertItem.quantity || null,
             notes: insertItem.notes || null,
+            barcode: insertItem.barcode || null,
             createdAt: new Date().toISOString(),
         };
 

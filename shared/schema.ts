@@ -33,6 +33,7 @@ export interface FoodItem {
   expiryDate: string;
   quantity: string | null;
   notes: string | null;
+  barcode: string | null;
   createdAt: string;
 }
 
@@ -56,6 +57,7 @@ export const insertFoodItemSchema = z.object({
   expiryDate: z.string().min(1, "Expiry date is required"),
   quantity: z.string().optional(),
   notes: z.string().optional(),
+  barcode: z.string().optional(),
 });
 
 // Type exports

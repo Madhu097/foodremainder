@@ -380,6 +380,7 @@ class NotificationChecker {
           expiryDate: new Date().toISOString(),
           category: 'Test',
           notes: 'This is a test notification.',
+          barcode: null,
           createdAt: new Date().toISOString()
         };
 

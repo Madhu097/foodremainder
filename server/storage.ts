@@ -180,6 +180,7 @@ export class MemStorage implements IStorage {
       userId,
       quantity: insertItem.quantity || null,
       notes: insertItem.notes || null,
+      barcode: insertItem.barcode || null,
       createdAt: new Date().toISOString(),
     };
     this.foodItems.set(id, foodItem);

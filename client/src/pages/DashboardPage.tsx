@@ -17,13 +17,13 @@ export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // Initialize auth state from localStorage immediately to prevent mismatches
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const userStr = safeLocalStorage.getItem("user");
     return !!userStr;
   });
-  
+
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const userStr = safeLocalStorage.getItem("user");
     if (userStr) {
@@ -49,14 +49,14 @@ export default function DashboardPage() {
       setLocation("/auth?mode=login");
     }
   }, []);
-  
+
   // Fetch food items using React Query for automatic caching and background refresh
   // Using optimized batch endpoint that fetches everything in one request
   const { data: foodItemsData, isLoading, error, refetch } = useQuery({
     queryKey: ['foodItems', currentUser?.id],
     queryFn: async () => {
       if (!currentUser?.id) return { items: [] };
-      
+
       // Try the optimized batch endpoint first
       try {
         const response = await fetch(`${API_BASE_URL}/api/dashboard/${currentUser.id}`, {
@@ -83,11 +83,13 @@ export default function DashboardPage() {
       return response.json();
     },
     enabled: !!currentUser?.id,
-    staleTime: 60000, // Cache for 1 minute
+    staleTime: 30000, // Reduced to 30 seconds for faster updates
     gcTime: 300000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: true, // Refetch when user returns to tab
-    refetchOnMount: false, // Don't refetch on mount if data is fresh
+    refetchOnMount: true, // Always refetch on mount for fresh data
     refetchOnReconnect: true, // Refetch when reconnecting to internet
+    retry: 2, // Retry failed requests twice
+    retryDelay: 1000, // Wait 1 second between retries
   });
 
   // Server now returns items with status pre-calculated
@@ -135,7 +137,7 @@ export default function DashboardPage() {
 
       // Optimistically update the cache
       const previousData = queryClient.getQueryData(['foodItems', currentUser?.id]);
-      
+
       queryClient.setQueryData(['foodItems', currentUser?.id], (old: any) => ({
         items: [...(old?.items || []), { ...newItem, id: 'temp-' + Date.now() }]
       }));
@@ -176,32 +178,21 @@ export default function DashboardPage() {
       if (!response.ok) throw new Error("Failed to update item");
       return response.json();
     },
-    onMutate: async ({ id, data }) => {
-      await queryClient.cancelQueries({ queryKey: ['foodItems', currentUser?.id] });
-      
-      const previousData = queryClient.getQueryData(['foodItems', currentUser?.id]);
-      
-      queryClient.setQueryData(['foodItems', currentUser?.id], (old: any) => ({
-        items: (old?.items || []).map((item: any) => 
-          item.id === id ? { ...item, ...data } : item
-        )
-      }));
+    onSuccess: async () => {
+      // Immediately invalidate and refetch to get server-calculated fields
+      await queryClient.invalidateQueries({ queryKey: ['foodItems', currentUser?.id] });
+      await queryClient.refetchQueries({ queryKey: ['foodItems', currentUser?.id] });
 
-      return { previousData };
+      toast({
+        title: "Updated!",
+        description: "Food item updated successfully.",
+      });
     },
-    onError: (err, variables, context) => {
-      queryClient.setQueryData(['foodItems', currentUser?.id], context?.previousData);
+    onError: (err) => {
       toast({
         title: "Error",
         description: "Failed to update food item. Please try again.",
         variant: "destructive",
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['foodItems', currentUser?.id] });
-      toast({
-        title: "Updated!",
-        description: "Food item updated successfully.",
       });
     },
   });
@@ -243,9 +234,9 @@ export default function DashboardPage() {
     },
     onMutate: async (itemId) => {
       await queryClient.cancelQueries({ queryKey: ['foodItems', currentUser?.id] });
-      
+
       const previousData = queryClient.getQueryData(['foodItems', currentUser?.id]);
-      
+
       queryClient.setQueryData(['foodItems', currentUser?.id], (old: any) => ({
         items: (old?.items || []).filter((item: any) => item.id !== itemId)
       }));
@@ -476,6 +467,9 @@ export default function DashboardPage() {
           category: editingItem.category,
           purchaseDate: editingItem.purchaseDate,
           expiryDate: editingItem.expiryDate,
+          quantity: editingItem.quantity || undefined,
+          notes: editingItem.notes || undefined,
+          barcode: editingItem.barcode || undefined,
         } : null}
       />
     </div>

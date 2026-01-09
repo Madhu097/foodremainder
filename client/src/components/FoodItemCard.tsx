@@ -11,6 +11,7 @@ export interface FoodItem {
   expiryDate: string;
   quantity?: string | null;
   notes?: string | null;
+  barcode?: string | null;
   status: "fresh" | "expiring" | "expired";
   daysLeft: number;
 }
