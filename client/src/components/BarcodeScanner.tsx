@@ -75,7 +75,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col">{/* Increased z-index to appear above modal */}
             {/* Header */}
             <div className="bg-background/95 backdrop-blur border-b p-4 flex justify-between items-center">
                 <div>
