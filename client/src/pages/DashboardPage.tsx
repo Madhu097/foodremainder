@@ -128,7 +128,11 @@ export default function DashboardPage() {
         credentials: "include",
       });
 
-      if (!response.ok) throw new Error("Failed to add item");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
+        console.error("[AddFood] Server error:", response.status, errorData);
+        throw new Error(errorData.message || `Failed to add item (${response.status})`);
+      }
       return response.json();
     },
     onMutate: async (newItem) => {
@@ -147,9 +151,14 @@ export default function DashboardPage() {
     onError: (err, newItem, context) => {
       // Rollback on error
       queryClient.setQueryData(['foodItems', currentUser?.id], context?.previousData);
+
+      // Log detailed error for debugging
+      console.error("[AddFood] Error adding food item:", err);
+      console.error("[AddFood] Item data:", newItem);
+
       toast({
         title: "Error",
-        description: "Failed to add food item. Please try again.",
+        description: err instanceof Error ? err.message : "Failed to add food item. Please try again.",
         variant: "destructive",
       });
     },
