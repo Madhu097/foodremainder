@@ -396,13 +396,17 @@ export class FirebaseStorage implements IStorage {
 
         console.log(`[FirebaseStorage] 💾 Fetching food items from database for user: ${userId}`);
         try {
-            // Try with orderBy first (requires Firestore index) - ordered by expiry for faster processing
+            // Fetch items without ordering to avoid missing index errors
+            // Performance impact is negligible for typical user data sizes (< 100 items)
+            // This avoids the latency of try-catch-fallback flow
             const snapshot = await db.collection('foodItems')
                 .where('userId', '==', userId)
-                .orderBy('expiryDate', 'asc')
                 .get();
 
             const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
+
+            // Sort in memory by expiry date (asc)
+            items.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
 
             // Cache the results for 60 seconds
             this.foodItemsCache.set(cacheKey, items);
@@ -413,30 +417,6 @@ export class FirebaseStorage implements IStorage {
             console.error(`[FirebaseStorage] Error fetching items:`, error);
             console.error(`[FirebaseStorage] Error code:`, error.code);
             console.error(`[FirebaseStorage] Error message:`, error.message);
-
-            // If orderBy fails (no index), fallback to query without orderBy
-            if (error.code === 9 || error.code === '9' || error.message?.includes('index') || error.message?.includes('requires an index') || error.message?.includes('FAILED_PRECONDITION')) {
-                console.log(`[FirebaseStorage] ⚠️ Index not available, using fallback query without orderBy`);
-                try {
-                    const snapshot = await db.collection('foodItems')
-                        .where('userId', '==', userId)
-                        .get();
-
-                    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
-
-                    // Sort in memory by expiry date
-                    items.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
-
-                    // Cache the results
-                    this.foodItemsCache.set(cacheKey, items);
-
-                    return items;
-                } catch (fallbackError) {
-                    console.error(`[FirebaseStorage] Fallback query also failed:`, fallbackError);
-                    throw fallbackError;
-                }
-            }
-            // Re-throw other errors
             throw error;
         }
     }

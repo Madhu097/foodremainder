@@ -11,7 +11,11 @@ const envPath = resolve(__dirname, '../.env');
 const result = dotenv.config({ path: envPath });
 
 if (result.error) {
-    console.error('[dotenv] ❌ Error loading .env:', result.error);
+    // In production, it's normal for .env to be missing (env vars injected)
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!isProduction || (result.error as any).code !== 'ENOENT') {
+        console.warn('[dotenv] ⚠️  Note: .env file not loaded:', (result.error as any).message);
+    }
 } else {
     console.log('[dotenv] ✅ Loaded .env file from:', envPath);
 }

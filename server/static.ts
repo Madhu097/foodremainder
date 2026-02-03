@@ -11,8 +11,19 @@ export function serveStatic(app: Express) {
         );
     }
 
-    // Serve static files from the dist/public directory
-    app.use(express.static(distPath));
+    // Serve static files from the dist directory with aggressive caching for assets
+    app.use(express.static(distPath, {
+        maxAge: '1d', // default
+        setHeaders: (res, filePath) => {
+            if (filePath.includes('assets') || filePath.match(/\.[0-9a-f]{8,}\./)) {
+                // Cache assets (hashed files) for 1 year
+                res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            } else {
+                // Don't cache HTML files (must revalidate)
+                res.setHeader('Cache-Control', 'no-cache');
+            }
+        }
+    }));
 
     // SPA fallback - serve index.html for all non-API routes
     // This ensures that client-side routing works on page refresh

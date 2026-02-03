@@ -170,15 +170,33 @@ function initializeServices() {
   // doesn't interfere with the other routes
   // Auto-detect development mode (NODE_ENV or check if dist folder exists)
   // Modified to prioritize npm dev script
-  const isDevelopment = process.env.NODE_ENV !== "production" &&
-    (process.env["npm_lifecycle_event"] === "dev" || !fs.existsSync(path.resolve(import.meta.dirname, "..", "dist", "public")));
+  // Auto-detect development mode
+  // 1. Explicitly check NODE_ENV
+  const isProduction = process.env.NODE_ENV === "production";
+
+  // 2. If not strictly production, checking other signals
+  // Check if we are running from a built file (not tsx/ts-node)
+  const isBuilt = import.meta.filename?.endsWith('.js') || false;
+
+  // 3. Fallback logic: It's dev if not production and (npm run dev OR dist missing)
+  const isDevelopment = !isProduction &&
+    (process.env["npm_lifecycle_event"] === "dev" || !isBuilt);
+
+  log(`[System] NODE_ENV: ${process.env.NODE_ENV}`);
+  log(`[System] Running in ${isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
 
   if (isDevelopment) {
-    log("Running in DEVELOPMENT mode with Vite");
     const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
-    log("Running in PRODUCTION mode");
+    // In production, verify that dist exists
+    const distPath = path.resolve(import.meta.dirname, "..", "dist");
+    const indexPath = path.resolve(distPath, "index.html");
+
+    if (!fs.existsSync(indexPath)) {
+      log(`[System] ⚠️  WARNING: Production build not found at ${distPath}`);
+      log(`[System] ⚠️  Ensure 'npm run build' ran successfully.`);
+    }
     const { serveStatic } = await import("./static");
     serveStatic(app);
   }
