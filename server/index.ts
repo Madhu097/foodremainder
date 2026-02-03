@@ -188,7 +188,10 @@ function initializeServices() {
   if (isDevelopment) {
     const { setupVite } = await import("./vite");
     await setupVite(app, server);
-  } else {
+  } else if (process.env.VERCEL !== "1") {
+    // Only serve static files if NOT on Vercel (e.g. Render, Heroku)
+    // On Vercel, Vercel itself serves the static files based on vercel.json.
+
     // In production, verify that dist exists
     const distPath = path.resolve(import.meta.dirname, "..", "dist");
     const indexPath = path.resolve(distPath, "index.html");
@@ -207,7 +210,6 @@ function initializeServices() {
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
   });
 
   // Start the server

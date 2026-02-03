@@ -6,9 +6,9 @@ export function serveStatic(app: Express) {
     const distPath = path.resolve(import.meta.dirname, "..", "dist");
 
     if (!fs.existsSync(distPath)) {
-        throw new Error(
-            `Could not find the build directory: ${distPath}, make sure to build the client first`,
-        );
+        console.warn(`[Static] ⚠️  Warning: Build directory not found at ${distPath}`);
+        console.warn(`[Static] 💡 This is fine on Vercel, but for other environments ensure 'npm run build' completed.`);
+        return;
     }
 
     // Serve static files from the dist directory with aggressive caching for assets

@@ -215,7 +215,7 @@ async function initializeStorage(): Promise<IStorage> {
   // Check if Firebase is configured
   if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
     try {
-      const { FirebaseStorage } = await import('./firebaseStorage.js');
+      const { FirebaseStorage } = await import('./firebaseStorage');
       console.log("[Storage] ✅ Using Firebase Firestore");
       console.log("[Storage] 💾 Data will persist in Firebase");
       storageInstance = new FirebaseStorage();
