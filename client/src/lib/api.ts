@@ -48,13 +48,13 @@ export const getApiBaseUrl = (): string => {
     console.log('[API Config] Using default Render URL');
     console.log('[API Config] ========================================');
     // For Vercel production, we want to force using the environment variable
-    // or relative URL if backend is on the same domain (not the case here)
-    // BUT we should not hardcode the backend URL here to avoid confusion
-    console.log('[API Config] No VITE_API_URL set, defaulting to empty string (will fail if separate backend)');
+    // But since the user is struggling to configure it, we will fallback to the
+    // known Render backend URL to ensure it works out of the box.
+    console.log('[API Config] No VITE_API_URL set, defaulting to Render Backend URL');
     console.log('[API Config] ========================================');
-    console.log('[API Config] Final API_BASE_URL:', '');
+    console.log('[API Config] Final API_BASE_URL:', 'https://foodremainder.onrender.com');
     console.log('[API Config] ========================================');
-    return '';
+    return 'https://foodremainder.onrender.com';
   }
 
   // Default to empty string for relative URLs in development
