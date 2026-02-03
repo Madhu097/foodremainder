@@ -76,6 +76,13 @@ export default defineConfig({
     cssCodeSplit: true,
   },
   server: {
+    proxy: {
+      '/api': {
+        target: 'http://0.0.0.0:5000',
+        changeOrigin: true,
+      },
+    },
+    host: "0.0.0.0",
     fs: {
       strict: true,
       deny: ["**/.*"],

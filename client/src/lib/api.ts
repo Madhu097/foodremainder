@@ -16,8 +16,8 @@ export const getApiBaseUrl = (): string => {
   }
 
   // If not localhost, we are in production (Vercel).
-  // Always point to Render backend.
-  return 'https://foodremainder.onrender.com';
+  // Use relative URL to let Vercel handle routing to serverless functions
+  return '';
 };
 
 export const API_BASE_URL = getApiBaseUrl();

@@ -191,10 +191,13 @@ function initializeServices() {
   });
 
   // Start the server
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
-  });
+  // Don't listen on port if running in Vercel (serverless)
+  if (process.env.VERCEL !== "1") {
+    const port = parseInt(process.env.PORT || '5000', 10);
+    server.listen(port, "0.0.0.0", () => {
+      log(`serving on port ${port}`);
+    });
+  }
 })();
 
 // Export for serverless environments
