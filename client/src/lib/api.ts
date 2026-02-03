@@ -4,28 +4,20 @@
 
 // Get the API base URL based on environment
 export const getApiBaseUrl = (): string => {
-  const isLocalhost = typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  // Simple, robust check for environment
+  if (typeof window === 'undefined') return '';
 
-  console.log('[API Config] ========================================');
-  console.log('[API Config] Hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
-  console.log('[API Config] Is Localhost:', isLocalhost);
-  console.log('[API Config] VITE_API_URL:', import.meta.env.VITE_API_URL);
-  console.log('[API Config] import.meta.env.PROD:', import.meta.env.PROD);
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-  // Force Render URL for production deployments (Vercel)
-  if (import.meta.env.PROD && !isLocalhost) {
-    console.log('[API Config] Production detected (Vercel), using Render Backend');
-    return 'https://foodremainder.onrender.com';
-  }
-
-  // If running locally (dev or prod build), connect to local backend
   if (isLocalhost) {
-    if (import.meta.env.PROD) return 'http://localhost:5000';
-    return ''; // Proxy handles it in dev
+    // If running "npm run build" & "npm run start" locally, we want full URL
+    // If running "npm run dev", we use relative URL (proxy)
+    return import.meta.env.PROD ? 'http://localhost:5000' : '';
   }
 
-  return '';
+  // If not localhost, we are in production (Vercel).
+  // Always point to Render backend.
+  return 'https://foodremainder.onrender.com';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
