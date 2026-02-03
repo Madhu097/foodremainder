@@ -37,22 +37,12 @@ app.use(compression({
 log("✅ Response compression enabled (gzip/deflate)");
 
 // CORS middleware - must be before other middleware
+// CORS middleware - must be before other middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Allow all localhost origins for development
-  const isLocalhost = origin && (origin.includes('localhost') || origin.includes('127.0.0.1'));
-
-  // Allow Vercel deployments
-  const isVercel = origin && origin.endsWith('.vercel.app');
-
-  // Allow specific production domains
-  const allowedDomains = [
-    'https://foodremainder.vercel.app',
-  ];
-  const isAllowedDomain = origin && allowedDomains.includes(origin);
-
-  if (isLocalhost || isVercel || isAllowedDomain) {
+  // Allow all origins (since frontend is on Vercel and backend on Render)
+  if (origin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }

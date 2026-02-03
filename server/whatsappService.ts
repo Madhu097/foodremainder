@@ -39,7 +39,7 @@ class WhatsAppService {
       this.client = twilio(this.config.accountSid, this.config.authToken);
       console.log("[WhatsAppService] ✅ WhatsApp service initialized successfully");
       console.log("[WhatsAppService] From number: " + this.config.fromNumber);
-      
+
       // Check if using Twilio Sandbox
       if (this.config.fromNumber === 'whatsapp:+14155238886') {
         console.log("[WhatsAppService] 📱 Using Twilio WhatsApp Sandbox");
@@ -49,7 +49,7 @@ class WhatsAppService {
         console.log("[WhatsAppService]   2. Send 'join <your-sandbox-code>' to that number via WhatsApp");
         console.log("[WhatsAppService]   3. Find your sandbox code at: https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn");
       }
-      
+
       return true;
     } catch (error) {
       console.error("[WhatsAppService] ❌ Failed to initialize Twilio client:", error instanceof Error ? error.message : 'Unknown error');
@@ -76,6 +76,9 @@ class WhatsAppService {
       return false;
     }
 
+    let toNumber = "";
+    let whatsappNumber = "";
+
     try {
       const itemsList = expiringItems
         .map((item) => {
@@ -101,8 +104,8 @@ View your dashboard: ${process.env.APP_URL || "http://localhost:5000"}/dashboard
 
       // Format mobile number for WhatsApp
       // Twilio WhatsApp expects format: whatsapp:+1234567890
-      let toNumber = user.mobile.trim();
-      
+      toNumber = user.mobile.trim();
+
       // Remove any non-digit characters except +
       toNumber = toNumber.replace(/[^\d+]/g, '');
 
@@ -112,7 +115,7 @@ View your dashboard: ${process.env.APP_URL || "http://localhost:5000"}/dashboard
         toNumber = `+91${toNumber}`;
       }
 
-      const whatsappNumber = `whatsapp:${toNumber}`;
+      whatsappNumber = `whatsapp:${toNumber}`;
 
       console.log(`[WhatsAppService] Sending to: ${whatsappNumber}`);
       console.log(`[WhatsAppService] From: ${this.config!.fromNumber}`);
@@ -132,15 +135,15 @@ View your dashboard: ${process.env.APP_URL || "http://localhost:5000"}/dashboard
     } catch (error: any) {
       console.error("[WhatsAppService] ❌ Failed to send WhatsApp message:");
       console.error("[WhatsAppService] Error details:", error.message || error);
-      
+
       if (error.code) {
         console.error(`[WhatsAppService] Error code: ${error.code}`);
       }
-      
+
       if (error.moreInfo) {
         console.error(`[WhatsAppService] More info: ${error.moreInfo}`);
       }
-      
+
       // Common Twilio WhatsApp errors
       if (error.code === 63007) {
         console.error(`[WhatsAppService] ⚠️ User has not opted in to WhatsApp messages`);
@@ -153,7 +156,7 @@ View your dashboard: ${process.env.APP_URL || "http://localhost:5000"}/dashboard
       } else if (error.code === 20003) {
         console.error(`[WhatsAppService] ⚠️ Authentication error - check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN`);
       }
-      
+
       return false;
     }
   }

@@ -93,7 +93,7 @@ export default function DashboardPage() {
   });
 
   // Server now returns items with status pre-calculated
-  const foodItems = foodItemsData?.items || [];
+  const foodItems: FoodItem[] = foodItemsData?.items || [];
 
   // Check if free notification was dismissed
   useEffect(() => {
