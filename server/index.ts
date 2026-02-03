@@ -4,7 +4,7 @@ import "./loadEnv";
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { log } from "./utils";
 import { emailService } from "./emailService";
 import { whatsappService } from "./whatsappService";
 import { whatsappCloudService } from "./whatsappCloudService";
@@ -175,9 +175,11 @@ function initializeServices() {
 
   if (isDevelopment) {
     log("Running in DEVELOPMENT mode with Vite");
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
     log("Running in PRODUCTION mode");
+    const { serveStatic } = await import("./static");
     serveStatic(app);
   }
 
