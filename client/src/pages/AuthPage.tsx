@@ -22,7 +22,7 @@ export default function AuthPage() {
   const { toast } = useToast();
   const searchParams = new URLSearchParams(window.location.search);
   const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
-  
+
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -43,7 +43,7 @@ export default function AuthPage() {
     try {
       const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
       const fullUrl = `${API_BASE_URL}${endpoint}`;
-      
+
       const response = await fetch(fullUrl, {
         method: "POST",
         headers: {
@@ -53,7 +53,17 @@ export default function AuthPage() {
         credentials: "include",
       });
 
-      const result = await response.json();
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      let result;
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        console.error("[Auth] Non-JSON response:", text);
+        setError(`Server error: Received ${contentType || 'text'}. ${text.slice(0, 50)}...`);
+        return;
+      }
 
       if (!response.ok) {
         // Handle validation errors
@@ -81,7 +91,7 @@ export default function AuthPage() {
       console.error("[Auth] Caught error:", err);
       console.error("[Auth] Error type:", err instanceof Error ? err.constructor.name : typeof err);
       console.error("[Auth] Error message:", err instanceof Error ? err.message : String(err));
-      
+
       // More detailed error message
       if (err instanceof TypeError && err.message.includes('fetch')) {
         setError(`Cannot connect to server at ${API_BASE_URL}. Please check if the backend is running.`);
