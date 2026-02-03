@@ -17,6 +17,32 @@ import path from "path";
 
 const app = express();
 
+// CORS middleware - MUST be the very first middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // Allow all origins (since frontend is on Vercel and backend on Render)
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    // For non-browser tools that might not send origin, we can default to *
+    // but credentials require explicit origin.
+    // We'll leave it empty if no origin, standard CORS behavior.
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end(); // Respond with 200 OK for preflight
+  }
+
+  next();
+});
+
 // Enable compression for all responses (must be early in middleware chain)
 app.use(compression({
   // Compress all responses over 1kb
@@ -34,30 +60,7 @@ app.use(compression({
   }
 }));
 
-log("✅ Response compression enabled (gzip/deflate)");
-
-// CORS middleware - must be before other middleware
-// CORS middleware - must be before other middleware
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  // Allow all origins (since frontend is on Vercel and backend on Render)
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
-
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  next();
-});
+log("✅ API Services initializing...");
 
 // Increase body size limits for base64 image uploads
 app.use(express.json({ limit: '10mb' }));
