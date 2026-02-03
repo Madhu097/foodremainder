@@ -9,28 +9,34 @@ try {
     if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
         // Parse the private key - handle both formats
         let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-        
+
         // Remove any quotes that might have been added
         privateKey = privateKey.replace(/^["']|["']$/g, '');
-        
+
         // Replace literal \n with actual newlines
         privateKey = privateKey.replace(/\\n/g, '\n');
-        
+
         // Validate the key format
         if (!privateKey.includes('BEGIN PRIVATE KEY') || !privateKey.includes('END PRIVATE KEY')) {
             throw new Error('FIREBASE_PRIVATE_KEY appears to be malformed. It should start with "-----BEGIN PRIVATE KEY-----" and end with "-----END PRIVATE KEY-----"');
         }
-        
+
         console.log('[Firebase] 🔑 Private key format validated');
-        
-        // Initialize with service account credentials
-        firebaseApp = admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID!,
-                privateKey: privateKey,
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-            }),
-        });
+
+        if (!admin.apps.length) {
+            // Initialize with service account credentials
+            firebaseApp = admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID!,
+                    privateKey: privateKey,
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+                }),
+            });
+            console.log('[Firebase] ✅ Initialized new Firebase instance');
+        } else {
+            firebaseApp = admin.app();
+            console.log('[Firebase] ♻️  Reusing existing Firebase instance');
+        }
 
         db = firebaseApp.firestore();
         console.log('[Firebase] ✅ Connected to Firebase Firestore');
