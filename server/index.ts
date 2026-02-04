@@ -2,6 +2,7 @@
 import "./loadEnv";
 
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer } from "http";
 import compression from "compression";
 import { registerRoutes } from "./routes";
 import { log } from "./utils";
@@ -96,6 +97,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// Global error handlers to catch issues during initialization
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[System] ❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[System] ❌ Uncaught Exception:', err);
+  // On Vercel, we can't really do much here, but logging helps debug
+});
+
 // Initialize services immediately (only once)
 let servicesInitialized = false;
 
@@ -103,7 +114,11 @@ function initializeServices() {
   if (servicesInitialized) return;
   servicesInitialized = true;
 
-  log("Initializing notification services...");
+  // On Vercel, we don't want to start background schedulers as they aren't supported
+  const isVercel = process.env.VERCEL === "1";
+
+  log(`Initializing services (Vercel: ${isVercel})...`);
+
   const emailInitialized = emailService.initialize();
   const whatsappInitialized = whatsappService.initialize();
   const whatsappCloudInitialized = whatsappCloudService.initialize();
@@ -111,116 +126,76 @@ function initializeServices() {
   const telegramInitialized = telegramService.initialize();
   const pushInitialized = pushService.initialize();
 
-  if (emailInitialized) {
-    log("✓ Email notifications enabled");
-  } else {
-    log("⚠ Email notifications disabled (configure EMAIL_* or RESEND_API_KEY environment variables)");
-  }
-
-  if (whatsappInitialized) {
-    log("✓ WhatsApp notifications enabled (Twilio)");
-  } else if (whatsappCloudInitialized) {
-    log("✓ WhatsApp notifications enabled (FREE Cloud API)");
-  } else {
-    log("⚠ WhatsApp notifications disabled (configure TWILIO_* or WHATSAPP_CLOUD_* environment variables)");
-  }
-
-  if (smsInitialized) {
-    log("✓ SMS notifications enabled");
-  } else {
-    log("⚠ SMS notifications disabled (configure TWILIO_* environment variables)");
-  }
-
-  if (telegramInitialized) {
-    log("✓ Telegram notifications enabled");
-  } else {
-    log("⚠ Telegram notifications disabled (configure TELEGRAM_BOT_TOKEN environment variable)");
-  }
-
-  if (pushInitialized) {
-    log("✓ Push notifications enabled");
-  } else {
-    log("⚠ Push notifications disabled (configure VAPID_KEYs)");
-  }
-
-  // Start the notification scheduler
-  const autoSchedule = process.env.NOTIFICATION_AUTO_SCHEDULE !== "false"; // Default: enabled
-  if (autoSchedule && (emailInitialized || whatsappInitialized || smsInitialized || telegramInitialized || pushInitialized)) {
-    try {
-      notificationScheduler.start();
-      log("✓ Notification scheduler started");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`⚠ Failed to start notification scheduler: ${errorMessage}`);
+  // Start the notification scheduler ONLY if not on Vercel
+  if (!isVercel) {
+    const autoSchedule = process.env.NOTIFICATION_AUTO_SCHEDULE !== "false";
+    if (autoSchedule && (emailInitialized || whatsappInitialized || smsInitialized || telegramInitialized || pushInitialized)) {
+      try {
+        notificationScheduler.start();
+        log("✓ Notification scheduler started");
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        log(`⚠ Failed to start notification scheduler: ${errorMessage}`);
+      }
     }
-  } else if (!autoSchedule) {
-    log("ℹ Automatic notification scheduling disabled (set NOTIFICATION_AUTO_SCHEDULE=true to enable)");
+  } else {
+    log("ℹ Notification scheduler disabled (running on Vercel)");
   }
 }
 
-// Main application startup
-(async () => {
-  initializeServices();
+// Register API routes immediately
+// This is critical for Vercel to ensure routes are available before any request
+const routesPromise = (async () => {
+  try {
+    initializeServices();
+    await registerRoutes(app);
 
-  // Register API routes FIRST
-  const server = await registerRoutes(app);
+    const isProduction = process.env.NODE_ENV === "production";
+    const isVercel = process.env.VERCEL === "1";
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  // Auto-detect development mode (NODE_ENV or check if dist folder exists)
-  // Modified to prioritize npm dev script
-  // Auto-detect development mode
-  // 1. Explicitly check NODE_ENV
-  const isProduction = process.env.NODE_ENV === "production";
-
-  // 2. If not strictly production, checking other signals
-  // Check if we are running from a built file (not tsx/ts-node)
-  const isBuilt = import.meta.filename?.endsWith('.js') || false;
-
-  // 3. Fallback logic: It's dev if not production and (npm run dev OR dist missing)
-  const isDevelopment = !isProduction &&
-    (process.env["npm_lifecycle_event"] === "dev" || !isBuilt);
-
-  log(`[System] NODE_ENV: ${process.env.NODE_ENV}`);
-  log(`[System] Running in ${isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
-
-  if (isDevelopment) {
-    const { setupVite } = await import("./vite");
-    await setupVite(app, server);
-  } else if (process.env.VERCEL !== "1") {
-    // Only serve static files if NOT on Vercel (e.g. Render, Heroku)
-    // On Vercel, Vercel itself serves the static files based on vercel.json.
-
-    // In production, verify that dist exists
-    const distPath = path.resolve(import.meta.dirname, "..", "dist");
-    const indexPath = path.resolve(distPath, "index.html");
-
-    if (!fs.existsSync(indexPath)) {
-      log(`[System] ⚠️  WARNING: Production build not found at ${distPath}`);
-      log(`[System] ⚠️  Ensure 'npm run build' ran successfully.`);
+    if (isProduction && !isVercel) {
+      const { serveStatic } = await import("./static");
+      serveStatic(app);
     }
-    const { serveStatic } = await import("./static");
-    serveStatic(app);
-  }
 
-  // Error handler should be AFTER all routes
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-  });
-
-  // Start the server
-  // Don't listen on port if running in Vercel (serverless)
-  if (process.env.VERCEL !== "1") {
-    const port = parseInt(process.env.PORT || '5000', 10);
-    server.listen(port, "0.0.0.0", () => {
-      log(`serving on port ${port}`);
+    // Final generic Error handler
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      console.error(`[Error] ${status}: ${message}`, err);
+      res.status(status).json({ message });
     });
+
+    log("✅ API Initialization complete");
+  } catch (error) {
+    console.error("❌ Failed to initialize API routes:", error);
   }
 })();
 
+// Middleware to ensure routes are registered before handling any request
+// This solves the race condition on Vercel cold starts
+app.use(async (req, res, next) => {
+  await routesPromise;
+  next();
+});
+
+// Start the server (local only)
+if (process.env.VERCEL !== "1") {
+  (async () => {
+    try {
+      // Wait for routes to be registered before listening
+      await routesPromise;
+      const server = createServer(app);
+      const port = parseInt(process.env.PORT || '5000', 10);
+      server.listen(port, "0.0.0.0", () => {
+        log(`serving on port ${port}`);
+      });
+    } catch (error) {
+      console.error("[System] ❌ Failed to start server:", error);
+    }
+  })();
+}
+
 // Export for serverless environments
 export default app;
+

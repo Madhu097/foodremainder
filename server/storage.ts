@@ -1,5 +1,6 @@
 import { type User, type InsertUser, type FoodItem, type InsertFoodItem } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { log } from "./utils";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -216,9 +217,8 @@ async function initializeStorage(): Promise<IStorage> {
   if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
     try {
       const { FirebaseStorage } = await import('./firebaseStorage');
-      console.log("[Storage] ✅ Using Firebase Firestore");
-      console.log("[Storage] 💾 Data will persist in Firebase");
       storageInstance = new FirebaseStorage();
+      log("✅ Using Firebase Firestore storage", "storage");
       return storageInstance;
     } catch (error) {
       console.error("[Storage] ❌ Failed to initialize Firebase Storage:", error);
@@ -227,9 +227,7 @@ async function initializeStorage(): Promise<IStorage> {
   }
 
   // Fall back to in-memory storage
-  console.log("[Storage] Using in-memory storage");
-  console.log("[Storage] 💾 Data will persist during this session only");
-  console.log("[Storage] 💡 Tip: Configure Firebase credentials in .env to enable persistent storage");
+  log("⚠️ Using in-memory storage (fallback)", "storage");
   storageInstance = new MemStorage();
   return storageInstance;
 }

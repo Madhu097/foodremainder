@@ -67,7 +67,6 @@ export class FirebaseStorage implements IStorage {
         // Check cache first
         const cached = this.userCache.get(id);
         if (cached) {
-            console.log(`[FirebaseStorage] 🚀 Cache hit for user: ${id}`);
             return cached;
         }
 
@@ -86,7 +85,6 @@ export class FirebaseStorage implements IStorage {
         // Check cache first
         const cached = this.allUsersCache.get('all');
         if (cached) {
-            console.log(`[FirebaseStorage] 🚀 Cache hit for all users (${cached.length} users)`);
             return cached;
         }
 
@@ -122,7 +120,6 @@ export class FirebaseStorage implements IStorage {
         const cacheKey = `username:${username}`;
         const cached = this.userCache.get(cacheKey);
         if (cached) {
-            console.log(`[FirebaseStorage] 🚀 Cache hit for username: ${username}`);
             return cached;
         }
 
@@ -147,7 +144,6 @@ export class FirebaseStorage implements IStorage {
         const cacheKey = `email:${email}`;
         const cached = this.userCache.get(cacheKey);
         if (cached) {
-            console.log(`[FirebaseStorage] 🚀 Cache hit for email: ${email}`);
             return cached;
         }
 
@@ -172,7 +168,6 @@ export class FirebaseStorage implements IStorage {
         const cacheKey = `mobile:${mobile}`;
         const cached = this.userCache.get(cacheKey);
         if (cached) {
-            console.log(`[FirebaseStorage] 🚀 Cache hit for mobile: ${mobile}`);
             return cached;
         }
 
@@ -390,7 +385,6 @@ export class FirebaseStorage implements IStorage {
         const cacheKey = `foodItems:${userId}`;
         const cached = this.foodItemsCache.get(cacheKey);
         if (cached) {
-            console.log(`[FirebaseStorage] 🚀 Cache hit for food items: ${userId} (${cached.length} items)`);
             return cached;
         }
 

@@ -113,7 +113,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register new user
   app.post("/api/auth/register", async (req: Request, res: Response) => {
-    console.log("[Auth] Registration request received");
     try {
       const validatedData = insertUserSchema.parse(req.body);
 
@@ -176,7 +175,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Login user
   app.post("/api/auth/login", async (req: Request, res: Response) => {
-    console.log("[Auth] Login request received");
     try {
       const validatedData = loginSchema.parse(req.body);
 
@@ -739,7 +737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[Notifications] ❌ Check all error:", error);
       console.error("[Notifications] Stack trace:", error instanceof Error ? error.stack : 'No stack');
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         message: "Failed to check notifications",
         error: error instanceof Error ? error.message : "Unknown error"
