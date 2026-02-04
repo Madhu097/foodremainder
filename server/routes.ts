@@ -23,25 +23,21 @@ function verifyPassword(password: string, hash: string): boolean {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Test endpoint to verify API is working
-  app.get("/api/health", (req: Request, res: Response) => {
+  // Common endpoints for UptimeRobot and other monitoring tools
+  const healthCheck = (req: Request, res: Response) => {
     res.status(200).json({
       status: "ok",
       message: "API is working",
       timestamp: new Date().toISOString(),
-      services: {
-        email: emailService.isConfigured(),
-        whatsapp: whatsappService.isConfigured(),
-        whatsappCloud: whatsappCloudService.isConfigured(),
-        telegram: telegramService.isConfigured(),
-        push: pushService.isConfigured(),
-      },
-      cors: {
-        origin: req.headers.origin || 'none',
-        host: req.headers.host,
-      }
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV
     });
-  });
+  };
+
+  app.get("/api", healthCheck);
+  app.get("/api/health", healthCheck);
+  app.get("/api/ping", healthCheck);
+  app.get("/api/keep-alive", healthCheck);
 
   // Optimized batch endpoint - fetch user data and food items in one request
   app.get("/api/dashboard/:userId", async (req: Request, res: Response) => {
