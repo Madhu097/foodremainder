@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { lazy, Suspense } from "react";
 
+import { FoodLoader } from "@/components/FoodLoader";
+
 // Lazy load pages for better performance
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
@@ -18,16 +20,11 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 // Loading fallback component with better UX
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted">
-    <div className="text-center space-y-4">
-      <div className="relative">
-        <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary mx-auto"></div>
-        <img
-          src="/logo.png"
-          alt="Loading"
-          className="absolute inset-0 m-auto h-8 w-8 object-contain animate-pulse"
-        />
-      </div>
-      <p className="text-sm text-muted-foreground animate-pulse">Loading...</p>
+    <div className="text-center space-y-6">
+      <FoodLoader size="lg" />
+      <p className="text-sm font-medium text-muted-foreground animate-pulse tracking-wide uppercase">
+        Initializing Inventory...
+      </p>
     </div>
   </div>
 );

@@ -263,10 +263,10 @@ export default function ProfilePage() {
       return profilePic;
     }
 
-    // Check if it's a valid preset ID - use PNG format
+    // Check if it's a valid preset ID - use SVG format for better performance
     const isPreset = AVATARS.some(a => a.id === profilePic);
     if (isPreset) {
-      return `/avatars/${profilePic}.png`;
+      return `/avatars/${profilePic}.svg`;
     }
 
     // Default fallback
@@ -713,7 +713,7 @@ export default function ProfilePage() {
                     >
                       <div className="relative w-14 h-14 rounded-full overflow-hidden shadow-sm bg-white ring-1 ring-slate-100 dark:ring-slate-800">
                         <img
-                          src={`/avatars/${avatar.id}.png`}
+                          src={`/avatars/${avatar.id}.svg`}
                           alt={avatar.name}
                           className="w-full h-full object-cover"
                           onError={(e) => {

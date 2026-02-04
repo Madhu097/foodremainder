@@ -28,15 +28,18 @@ class TelegramService {
             // Create bot without polling first to validate token
             this.bot = new TelegramBot(botToken, { polling: false });
 
-            // Verify token is valid before starting polling
+            // Verify token is valid
             this.bot.getMe().then((me) => {
                 this.botUsername = me.username || null;
                 console.log(`[TelegramService] ✅ Bot token verified: @${me.username}`);
 
-                // Token is valid, start polling
-                if (this.bot) {
+                // Token is valid, start polling ONLY if NOT on Vercel
+                const isVercel = process.env.VERCEL === "1";
+                if (this.bot && !isVercel) {
                     this.bot.startPolling({ restart: false });
                     console.log(`[TelegramService] ✅ Started polling for updates`);
+                } else if (isVercel) {
+                    console.log(`[TelegramService] ℹ Polling disabled on Vercel (running in serverless mode)`);
                 }
             }).catch((err) => {
                 console.error("[TelegramService] ❌ Invalid bot token or connection failed:", err.message);

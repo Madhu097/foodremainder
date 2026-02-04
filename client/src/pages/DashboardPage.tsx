@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Navbar } from "@/components/Navbar";
 import { StatsCard } from "@/components/StatsCard";
@@ -278,12 +278,21 @@ export default function DashboardPage() {
     }
   };
 
-  const stats = {
-    total: foodItems.length,
-    fresh: foodItems.filter((i) => i.status === "fresh").length,
-    expiring: foodItems.filter((i) => i.status === "expiring").length,
-    expired: foodItems.filter((i) => i.status === "expired").length,
-  };
+  const { stats, filteredItems } = useMemo(() => {
+    const total = foodItems.length;
+    const fresh = foodItems.filter((i) => i.status === "fresh").length;
+    const expiring = foodItems.filter((i) => i.status === "expiring").length;
+    const expired = foodItems.filter((i) => i.status === "expired").length;
+
+    const filtered = foodItems.filter(item =>
+      filterStatus === "all" || item.status === filterStatus
+    );
+
+    return {
+      stats: { total, fresh, expiring, expired },
+      filteredItems: filtered
+    };
+  }, [foodItems, filterStatus]);
 
   // Show loading or nothing while checking auth
   if (!isAuthenticated) {
@@ -447,16 +456,14 @@ export default function DashboardPage() {
               ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               : "space-y-4"
             }>
-              {foodItems
-                .filter(item => filterStatus === "all" || item.status === filterStatus)
-                .map((item) => (
-                  <FoodItemCard
-                    key={item.id}
-                    item={item}
-                    onEdit={handleEditFood}
-                    onDelete={handleDeleteFood}
-                  />
-                ))}
+              {filteredItems.map((item: any) => (
+                <FoodItemCard
+                  key={item.id}
+                  item={item}
+                  onEdit={handleEditFood}
+                  onDelete={handleDeleteFood}
+                />
+              ))}
             </div>
           )}
         </div>

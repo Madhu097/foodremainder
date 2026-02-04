@@ -57,16 +57,40 @@ export function Navbar({
         <div className="flex justify-between items-center h-16 gap-4">
           <Link href="/" className="flex items-center gap-0 hover-elevate active-elevate-2 px-2 py-1 rounded-md" data-testid="link-home">
             <motion.div
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.4, ease: "easeInOut" }}
+              whileHover={{ rotate: 10, scale: 1.1 }}
+              className="mr-2"
             >
-              <img
-                src="/logo.png"
-                alt="Food Reminder Logo"
-                className="h-12 w-12 object-contain"
-                loading="eager"
-                fetchPriority="high"
-              />
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 40 40"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="drop-shadow-sm"
+              >
+                <circle cx="20" cy="20" r="18" fill="url(#logo-grad)" />
+                <path
+                  d="M20 10C14.48 10 10 14.48 10 20C10 25.52 14.48 30 20 30C25.52 30 30 25.52 30 20"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M20 15V20L23 23"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle cx="24" cy="12" r="4" fill="#ef4444" />
+                <path d="M24 8C24.5 9.5 25.5 10 27 10" stroke="white" strokeWidth="1" />
+                <defs>
+                  <linearGradient id="logo-grad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#16a34a" />
+                    <stop offset="1" stopColor="#15803d" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </motion.div>
             <span className="text-xl font-bold">Food Reminder</span>
           </Link>
@@ -74,9 +98,9 @@ export function Navbar({
           <div className="hidden md:flex items-center gap-6">
             {isAuthenticated && (
               <>
-                <Link 
-                  href="/dashboard" 
-                  className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md" 
+                <Link
+                  href="/dashboard"
+                  className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md"
                   data-testid="link-dashboard"
                   onMouseEnter={handleDashboardHover}
                 >
