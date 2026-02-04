@@ -23,21 +23,34 @@ function verifyPassword(password: string, hash: string): boolean {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Common endpoints for UptimeRobot and other monitoring tools
+  // Enhanced health check for monitoring tools (UptimeRobot, etc.)
   const healthCheck = (req: Request, res: Response) => {
+    // Log monitoring hits for debugging
+    if (req.headers['user-agent']?.includes('UptimeRobot')) {
+      console.log(`[Monitor] 🤖 UptimeRobot hit: ${req.method} ${req.originalUrl}`);
+    }
+
     res.status(200).json({
       status: "ok",
-      message: "API is working",
+      uptime: Math.floor(process.uptime()),
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV
+      node: process.version,
+      memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
     });
   };
 
+  // Register health check on multiple common paths
+  // We handle both /api/path and /path in case Vercel prefix stripping varies
+  const monitorPaths = ["/api/health", "/health", "/api/ping", "/ping", "/api/keep-alive", "/keep-alive"];
+
+  // Handle /api specifically as a root health check
   app.get("/api", healthCheck);
-  app.get("/api/health", healthCheck);
-  app.get("/api/ping", healthCheck);
-  app.get("/api/keep-alive", healthCheck);
+  app.head("/api", healthCheck);
+
+  monitorPaths.forEach(path => {
+    app.get(path, healthCheck);
+    app.head(path, healthCheck);
+  });
 
   // Optimized batch endpoint - fetch user data and food items in one request
   app.get("/api/dashboard/:userId", async (req: Request, res: Response) => {
