@@ -117,7 +117,6 @@ var init_firebaseStorage = __esm({
         if (!db) throw new Error("Firestore not initialized");
         const cached = this.userCache.get(id);
         if (cached) {
-          console.log(`[FirebaseStorage] \u{1F680} Cache hit for user: ${id}`);
           return cached;
         }
         console.log(`[FirebaseStorage] \u{1F4BE} Fetching user from database: ${id}`);
@@ -131,7 +130,6 @@ var init_firebaseStorage = __esm({
         if (!db) throw new Error("Firestore not initialized");
         const cached = this.allUsersCache.get("all");
         if (cached) {
-          console.log(`[FirebaseStorage] \u{1F680} Cache hit for all users (${cached.length} users)`);
           return cached;
         }
         console.log(`[FirebaseStorage] \u{1F4BE} Fetching all users from database`);
@@ -159,7 +157,6 @@ var init_firebaseStorage = __esm({
         const cacheKey = `username:${username}`;
         const cached = this.userCache.get(cacheKey);
         if (cached) {
-          console.log(`[FirebaseStorage] \u{1F680} Cache hit for username: ${username}`);
           return cached;
         }
         console.log(`[FirebaseStorage] \u{1F4BE} Fetching user by username: ${username}`);
@@ -176,7 +173,6 @@ var init_firebaseStorage = __esm({
         const cacheKey = `email:${email}`;
         const cached = this.userCache.get(cacheKey);
         if (cached) {
-          console.log(`[FirebaseStorage] \u{1F680} Cache hit for email: ${email}`);
           return cached;
         }
         console.log(`[FirebaseStorage] \u{1F4BE} Fetching user by email: ${email}`);
@@ -193,7 +189,6 @@ var init_firebaseStorage = __esm({
         const cacheKey = `mobile:${mobile}`;
         const cached = this.userCache.get(cacheKey);
         if (cached) {
-          console.log(`[FirebaseStorage] \u{1F680} Cache hit for mobile: ${mobile}`);
           return cached;
         }
         console.log(`[FirebaseStorage] \u{1F4BE} Fetching user by mobile: ${mobile}`);
@@ -354,7 +349,6 @@ var init_firebaseStorage = __esm({
         const cacheKey = `foodItems:${userId}`;
         const cached = this.foodItemsCache.get(cacheKey);
         if (cached) {
-          console.log(`[FirebaseStorage] \u{1F680} Cache hit for food items: ${userId} (${cached.length} items)`);
           return cached;
         }
         console.log(`[FirebaseStorage] \u{1F4BE} Fetching food items from database for user: ${userId}`);
@@ -420,179 +414,20 @@ var init_firebaseStorage = __esm({
   }
 });
 
-// vite.config.ts
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-var vite_config_default;
-var init_vite_config = __esm({
-  async "vite.config.ts"() {
-    "use strict";
-    vite_config_default = defineConfig({
-      plugins: [
-        react(),
-        runtimeErrorOverlay(),
-        ...process.env.NODE_ENV !== "production" && process.env.REPL_ID !== void 0 ? [
-          await import("@replit/vite-plugin-cartographer").then(
-            (m) => m.cartographer()
-          ),
-          await import("@replit/vite-plugin-dev-banner").then(
-            (m) => m.devBanner()
-          )
-        ] : []
-      ],
-      resolve: {
-        alias: {
-          "@": path.resolve(import.meta.dirname, "client", "src"),
-          "@shared": path.resolve(import.meta.dirname, "shared"),
-          "@assets": path.resolve(import.meta.dirname, "attached_assets")
-        }
-      },
-      root: path.resolve(import.meta.dirname, "client"),
-      build: {
-        outDir: path.resolve(import.meta.dirname, "dist"),
-        emptyOutDir: true,
-        rollupOptions: {
-          output: {
-            manualChunks: {
-              // Separate vendor chunks for better caching
-              "react-vendor": ["react", "react-dom", "wouter"],
-              "ui-vendor": ["framer-motion", "lucide-react"],
-              "query-vendor": ["@tanstack/react-query"],
-              "radix-ui": [
-                "@radix-ui/react-dialog",
-                "@radix-ui/react-dropdown-menu",
-                "@radix-ui/react-select",
-                "@radix-ui/react-toast",
-                "@radix-ui/react-tooltip"
-              ]
-            },
-            // Optimize chunk file names for better caching
-            chunkFileNames: "assets/js/[name]-[hash].js",
-            entryFileNames: "assets/js/[name]-[hash].js",
-            assetFileNames: "assets/[ext]/[name]-[hash].[ext]"
-          }
-        },
-        chunkSizeWarningLimit: 1e3,
-        minify: "terser",
-        terserOptions: {
-          compress: {
-            drop_console: true,
-            drop_debugger: true,
-            pure_funcs: ["console.log", "console.info", "console.debug"],
-            passes: 2
-          },
-          mangle: {
-            safari10: true
-          },
-          format: {
-            comments: false
-          }
-        },
-        cssMinify: true,
-        // Enable source maps for production debugging (optional, can be disabled)
-        sourcemap: false,
-        // Optimize asset inlining
-        assetsInlineLimit: 4096,
-        // Enable CSS code splitting
-        cssCodeSplit: true
-      },
-      server: {
-        proxy: {
-          "/api": {
-            target: "http://0.0.0.0:5000",
-            changeOrigin: true
-          }
-        },
-        host: "0.0.0.0",
-        fs: {
-          strict: true,
-          deny: ["**/.*"]
-        }
-      }
-    });
-  }
-});
-
-// server/vite.ts
-var vite_exports = {};
-__export(vite_exports, {
-  setupVite: () => setupVite
-});
-import fs from "fs";
-import path2 from "path";
-import { createServer as createViteServer, createLogger } from "vite";
-import { nanoid } from "nanoid";
-async function setupVite(app2, server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true
-  };
-  const vite = await createViteServer({
-    ...vite_config_default,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      }
-    },
-    server: serverOptions,
-    appType: "custom"
-  });
-  app2.use(vite.middlewares);
-  app2.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
-    if (url.startsWith("/api")) {
-      return next();
-    }
-    try {
-      const clientTemplate = path2.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html"
-      );
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e);
-      console.error("Error serving page:", e);
-      next(e);
-    }
-  });
-}
-var viteLogger;
-var init_vite = __esm({
-  async "server/vite.ts"() {
-    "use strict";
-    await init_vite_config();
-    viteLogger = createLogger();
-  }
-});
-
 // server/static.ts
 var static_exports = {};
 __export(static_exports, {
   serveStatic: () => serveStatic
 });
 import express from "express";
-import fs2 from "fs";
-import path3 from "path";
+import fs from "fs";
+import path from "path";
 function serveStatic(app2) {
-  const distPath = path3.resolve(import.meta.dirname, "..", "dist");
-  if (!fs2.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
-    );
+  const distPath = path.resolve(import.meta.dirname, "..", "dist");
+  if (!fs.existsSync(distPath)) {
+    console.warn(`[Static] \u26A0\uFE0F  Warning: Build directory not found at ${distPath}`);
+    console.warn(`[Static] \u{1F4A1} This is fine on Vercel, but for other environments ensure 'npm run build' completed.`);
+    return;
   }
   app2.use(express.static(distPath, {
     maxAge: "1d",
@@ -609,7 +444,7 @@ function serveStatic(app2) {
     if (req.originalUrl.startsWith("/api")) {
       return res.status(404).json({ message: "API endpoint not found" });
     }
-    res.sendFile(path3.resolve(distPath, "index.html"));
+    res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
 var init_static = __esm({
@@ -637,6 +472,7 @@ if (result.error) {
 
 // server/index.ts
 import express2 from "express";
+import { createServer as createServer2 } from "http";
 import compression from "compression";
 
 // server/routes.ts
@@ -644,6 +480,19 @@ import { createServer } from "http";
 
 // server/storage.ts
 import { randomUUID as randomUUID2 } from "crypto";
+
+// server/utils.ts
+function log(message, source = "express") {
+  const formattedTime = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
+
+// server/storage.ts
 var MemStorage = class {
   users;
   foodItems;
@@ -795,18 +644,15 @@ async function initializeStorage() {
   if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
     try {
       const { FirebaseStorage: FirebaseStorage2 } = await Promise.resolve().then(() => (init_firebaseStorage(), firebaseStorage_exports));
-      console.log("[Storage] \u2705 Using Firebase Firestore");
-      console.log("[Storage] \u{1F4BE} Data will persist in Firebase");
       storageInstance = new FirebaseStorage2();
+      log("\u2705 Using Firebase Firestore storage", "storage");
       return storageInstance;
     } catch (error) {
       console.error("[Storage] \u274C Failed to initialize Firebase Storage:", error);
       console.log("[Storage] \u26A0\uFE0F  Falling back to in-memory storage");
     }
   }
-  console.log("[Storage] Using in-memory storage");
-  console.log("[Storage] \u{1F4BE} Data will persist during this session only");
-  console.log("[Storage] \u{1F4A1} Tip: Configure Firebase credentials in .env to enable persistent storage");
+  log("\u26A0\uFE0F Using in-memory storage (fallback)", "storage");
   storageInstance = new MemStorage();
   return storageInstance;
 }
@@ -1823,9 +1669,12 @@ var TelegramService = class {
       this.bot.getMe().then((me) => {
         this.botUsername = me.username || null;
         console.log(`[TelegramService] \u2705 Bot token verified: @${me.username}`);
-        if (this.bot) {
+        const isVercel = process.env.VERCEL === "1";
+        if (this.bot && !isVercel) {
           this.bot.startPolling({ restart: false });
           console.log(`[TelegramService] \u2705 Started polling for updates`);
+        } else if (isVercel) {
+          console.log(`[TelegramService] \u2139 Polling disabled on Vercel (running in serverless mode)`);
         }
       }).catch((err) => {
         console.error("[TelegramService] \u274C Invalid bot token or connection failed:", err.message);
@@ -2401,6 +2250,335 @@ var NotificationChecker = class {
 };
 var notificationChecker = new NotificationChecker();
 
+// server/aiService.ts
+var FOOD_KNOWLEDGE_BASE = {
+  // Dairy
+  milk: { category: "Dairy", shelfLifeDays: 7, storage: "fridge", tips: "Keep in the main fridge body, not the door where temperature fluctuates." },
+  cheese: { category: "Dairy", shelfLifeDays: 21, storage: "fridge", tips: "Wrap in parchment paper rather than plastic wrap to let it breathe." },
+  yogurt: { category: "Dairy", shelfLifeDays: 14, storage: "fridge", tips: "Keep tightly sealed; watery whey separation is natural\u2014just stir it in." },
+  butter: { category: "Dairy", shelfLifeDays: 60, storage: "fridge", tips: "Can be frozen for up to 9 months if unopened." },
+  cream: { category: "Dairy", shelfLifeDays: 10, storage: "fridge", tips: "Use within 7-10 days after opening." },
+  paneer: { category: "Dairy", shelfLifeDays: 5, storage: "fridge", tips: "Submerge in fresh water in an airtight container to keep moist." },
+  // Fruits
+  banana: { category: "Fruits", shelfLifeDays: 5, storage: "pantry", tips: "Store away from other fruits to prevent rapid ripening from ethylene gas." },
+  apple: { category: "Fruits", shelfLifeDays: 28, storage: "fridge", tips: "Apples last 3-4x longer in the crisper drawer than at room temperature." },
+  strawberry: { category: "Fruits", shelfLifeDays: 4, storage: "fridge", tips: "Do not wash until right before eating to prevent mold." },
+  berries: { category: "Fruits", shelfLifeDays: 5, storage: "fridge", tips: "Store in a single layer lined with paper towel in a breathable container." },
+  orange: { category: "Fruits", shelfLifeDays: 21, storage: "fridge", tips: "Can stay at room temp for 1 week, or crisper drawer for 3-4 weeks." },
+  lemon: { category: "Fruits", shelfLifeDays: 21, storage: "fridge", tips: "Store in a sealed bag in the fridge to keep juicy." },
+  avocado: { category: "Fruits", shelfLifeDays: 4, storage: "pantry", tips: "Ripen on counter, then move to fridge to prolong freshness by 3-5 days." },
+  tomato: { category: "Fruits", shelfLifeDays: 7, storage: "pantry", tips: "Store stem-side down at room temp. Refrigeration ruins texture and flavor." },
+  mango: { category: "Fruits", shelfLifeDays: 6, storage: "pantry", tips: "Keep at room temp until soft and fragrant, then refrigerate." },
+  // Vegetables
+  spinach: { category: "Vegetables", shelfLifeDays: 5, storage: "fridge", tips: "Place a dry paper towel in the box to absorb excess moisture." },
+  lettuce: { category: "Vegetables", shelfLifeDays: 7, storage: "fridge", tips: "Keep leaves dry. Wrap in a cloth or paper towel inside crisper." },
+  carrot: { category: "Vegetables", shelfLifeDays: 21, storage: "fridge", tips: "Remove green tops before storing; they pull moisture from roots." },
+  potato: { category: "Vegetables", shelfLifeDays: 30, storage: "pantry", tips: "Store in a cool, dark, ventilated spot. Never next to onions." },
+  onion: { category: "Vegetables", shelfLifeDays: 30, storage: "pantry", tips: "Keep dry and ventilated. Do not store in plastic bags." },
+  garlic: { category: "Vegetables", shelfLifeDays: 60, storage: "pantry", tips: "Keep whole heads in an open container at room temp." },
+  broccoli: { category: "Vegetables", shelfLifeDays: 7, storage: "fridge", tips: "Mist heads loosely or wrap in damp paper towel." },
+  cucumber: { category: "Vegetables", shelfLifeDays: 7, storage: "fridge", tips: "Sensitive to cold; keep near front of fridge or warm zone." },
+  bell_pepper: { category: "Vegetables", shelfLifeDays: 10, storage: "fridge", tips: "Keep whole and dry in crisper drawer." },
+  mushroom: { category: "Vegetables", shelfLifeDays: 6, storage: "fridge", tips: "Keep in original brown paper bag to let moisture escape." },
+  // Meat & Seafood
+  chicken: { category: "Meat", shelfLifeDays: 2, storage: "fridge", tips: "Keep on lowest fridge shelf to avoid drips. Freeze if not cooking within 48h." },
+  beef: { category: "Meat", shelfLifeDays: 3, storage: "fridge", tips: "Ground beef lasts 1-2 days; whole cuts last 3-5 days refrigerated." },
+  fish: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Cook within 24-48 hours or freeze immediately." },
+  salmon: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Keep on a bed of ice or in the coldest corner of the fridge." },
+  prawns: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Thaw slowly in fridge, cook promptly." },
+  egg: { category: "Dairy", shelfLifeDays: 28, storage: "fridge", tips: "Keep in carton in main fridge shelf, not on door rack." },
+  // Grains & Bakery
+  bread: { category: "Grains", shelfLifeDays: 6, storage: "pantry", tips: "Avoid fridge (causes staling). Slice and freeze for long-term storage." },
+  rice: { category: "Grains", shelfLifeDays: 180, storage: "pantry", tips: "Store in airtight jar in dry pantry. Cooked rice lasts 3-4 days in fridge." },
+  pasta: { category: "Grains", shelfLifeDays: 365, storage: "pantry", tips: "Dry pasta lasts 1-2 years. Cooked pasta lasts 4-5 days." },
+  flour: { category: "Grains", shelfLifeDays: 240, storage: "pantry", tips: "Seal tightly in container to prevent pantry bugs." },
+  oats: { category: "Grains", shelfLifeDays: 180, storage: "pantry", tips: "Keep cool and dry. Ideal container prevents humidity absorption." }
+};
+var AIService = class {
+  apiKey = null;
+  constructor() {
+    this.apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || null;
+  }
+  hasGeminiKey() {
+    return Boolean(this.apiKey && this.apiKey.trim().length > 10);
+  }
+  /**
+   * Predict shelf life and storage recommendations for a given food item name
+   */
+  async predictShelfLife(foodName, userCategory) {
+    const cleanName = foodName.toLowerCase().trim();
+    if (this.hasGeminiKey()) {
+      try {
+        const prompt = `As a professional culinary preservation expert, return JSON only for this food item: "${foodName}".
+Format:
+{
+  "category": "Dairy" | "Fruits" | "Vegetables" | "Meat" | "Seafood" | "Grains" | "Beverages" | "Snacks" | "Other",
+  "shelfLifeDays": number (standard fresh refrigerated or pantry shelf-life from purchase date),
+  "storageLocation": "fridge" | "pantry" | "freezer",
+  "storageTips": "One short, practical sentence on best storage method to maximize freshness."
+}`;
+        const response = await this.callGemini(prompt);
+        if (response) {
+          const parsed = this.parseJsonFromMarkdown(response);
+          if (parsed && parsed.shelfLifeDays) {
+            return {
+              foodName,
+              category: parsed.category || userCategory || "Other",
+              shelfLifeDays: Math.max(1, Number(parsed.shelfLifeDays) || 7),
+              storageLocation: parsed.storageLocation || "fridge",
+              storageTips: parsed.storageTips || "Keep sealed in a cool environment.",
+              confidence: 0.95
+            };
+          }
+        }
+      } catch (err) {
+        console.warn("[AIService] Gemini call failed, falling back to knowledge base:", err);
+      }
+    }
+    for (const [key, value] of Object.entries(FOOD_KNOWLEDGE_BASE)) {
+      if (cleanName.includes(key) || key.includes(cleanName)) {
+        return {
+          foodName,
+          category: userCategory || value.category,
+          shelfLifeDays: value.shelfLifeDays,
+          storageLocation: value.storage,
+          storageTips: value.tips,
+          confidence: 0.9
+        };
+      }
+    }
+    const cat = (userCategory || "").toLowerCase();
+    if (cat.includes("dairy")) {
+      return { foodName, category: "Dairy", shelfLifeDays: 7, storageLocation: "fridge", storageTips: "Store in coldest section of the refrigerator.", confidence: 0.75 };
+    }
+    if (cat.includes("fruit")) {
+      return { foodName, category: "Fruits", shelfLifeDays: 6, storageLocation: "fridge", storageTips: "Keep unwashed in the produce drawer.", confidence: 0.75 };
+    }
+    if (cat.includes("veg")) {
+      return { foodName, category: "Vegetables", shelfLifeDays: 7, storageLocation: "fridge", storageTips: "Wrap in a dry cloth or paper towel to control moisture.", confidence: 0.75 };
+    }
+    if (cat.includes("meat")) {
+      return { foodName, category: "Meat", shelfLifeDays: 3, storageLocation: "fridge", storageTips: "Keep chilled on bottom shelf or freeze immediately.", confidence: 0.8 };
+    }
+    if (cat.includes("seafood") || cat.includes("fish")) {
+      return { foodName, category: "Seafood", shelfLifeDays: 2, storageLocation: "fridge", storageTips: "Cook within 48 hours or freeze.", confidence: 0.85 };
+    }
+    if (cat.includes("grain") || cat.includes("bread")) {
+      return { foodName, category: "Grains", shelfLifeDays: 14, storageLocation: "pantry", storageTips: "Store in an airtight container away from moisture.", confidence: 0.7 };
+    }
+    return {
+      foodName,
+      category: userCategory || "Other",
+      shelfLifeDays: 7,
+      storageLocation: "fridge",
+      storageTips: "Keep sealed in an airtight container to retain quality.",
+      confidence: 0.6
+    };
+  }
+  /**
+   * Generate creative, delicious zero-waste recipes prioritizing expiring foods
+   */
+  async generateRecipes(items, preferences) {
+    const expiringItems = items.filter((i) => i.daysLeft !== void 0 ? i.daysLeft <= 4 : true).slice(0, 8);
+    const availableNames = items.map((i) => i.name).slice(0, 15);
+    if (this.hasGeminiKey() && items.length > 0) {
+      try {
+        const prompt = `You are an expert zero-waste chef and nutritionist.
+The user has the following food items in their kitchen:
+All Items: ${availableNames.join(", ")}
+Expiring Soon: ${expiringItems.map((i) => `${i.name} (${i.daysLeft ?? "unknown"} days left)`).join(", ")}
+Preferences: Meal type: ${preferences?.mealType || "any"}, Dietary: ${preferences?.dietaryRestrictions || "none"}
+
+Generate 2-3 delicious, creative recipes that MAXIMIZE the use of the expiring ingredients.
+Return ONLY valid JSON matching this exact structure:
+[
+  {
+    "id": "recipe-1",
+    "title": "Recipe Name",
+    "description": "Short mouthwatering 1-2 sentence description",
+    "prepTime": "10 mins",
+    "cookTime": "15 mins",
+    "difficulty": "Easy" | "Medium" | "Advanced",
+    "servings": 2,
+    "expiringIngredientsUsed": ["Item 1", "Item 2"],
+    "additionalPantryItems": ["Salt", "Olive oil", "Garlic"],
+    "instructions": [
+      "Step 1...",
+      "Step 2...",
+      "Step 3..."
+    ],
+    "nutritionalHighlight": "Rich in antioxidants and lean protein"
+  }
+]`;
+        const response = await this.callGemini(prompt);
+        if (response) {
+          const parsed = this.parseJsonFromMarkdown(response);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (err) {
+        console.warn("[AIService] Gemini recipe generation fallback triggered:", err);
+      }
+    }
+    return this.generateHeuristicRecipes(items, preferences?.mealType);
+  }
+  /**
+   * Interactive AI Chef assistant answering kitchen preservation & cooking questions
+   */
+  async chatWithAssistant(userMessage, inventory = []) {
+    const inventorySummary = inventory.length > 0 ? `User's current inventory: ${inventory.map((i) => `${i.name} (${i.daysLeft ?? "?"} days left)`).join(", ")}.` : "User has no food items registered yet.";
+    if (this.hasGeminiKey()) {
+      try {
+        const prompt = `You are "Chef Remi", a warm, professional, and knowledgeable AI culinary assistant for the Food Reminder app.
+Your goals:
+1. Help users prevent food waste.
+2. Provide safe storage and preservation advice.
+3. Suggest quick recipes using their current items.
+4. Keep replies concise, helpful, and formatted in clean markdown with bullet points.
+
+Current Inventory:
+${inventorySummary}
+
+User question: "${userMessage}"`;
+        const answer = await this.callGemini(prompt);
+        if (answer) return answer;
+      } catch (err) {
+        console.warn("[AIService] Chat fallback triggered:", err);
+      }
+    }
+    const msg = userMessage.toLowerCase();
+    if (msg.includes("what should i cook") || msg.includes("recipe") || msg.includes("cook tonight")) {
+      const expiring = inventory.filter((i) => i.daysLeft !== void 0 && i.daysLeft <= 3);
+      if (expiring.length > 0) {
+        return `### \u{1F373} Quick Zero-Waste Recommendation
+
+Your most urgent items are **${expiring.map((i) => i.name).join(", ")}**.
+
+- **Frittata or Stir-fry**: A fantastic way to use up dairy, vegetables, and leftover meats in under 15 minutes.
+- **Smoothie Bowl**: Blend softening fruits with milk or yogurt.
+- **Hearty Soup**: Saut\xE9 all remaining vegetables with olive oil, broth, and herbs.`;
+      }
+      return `### \u{1F957} Chef Suggestion
+
+Take a look at your dashboard items! You can generate tailored recipes anytime using the **AI Recipes** button in the dashboard, or stir-fry your fresh produce with olive oil, garlic, and your favorite grains!`;
+    }
+    if (msg.includes("safe") || msg.includes("eat") || msg.includes("expired")) {
+      return `### \u{1F6E1}\uFE0F Food Safety Rule of Thumb
+
+- **"Use By" dates** relate to food safety\u2014do not consume meat, fish, or soft cheeses past this date.
+- **"Best Before" dates** relate to food quality and texture\u2014dry goods, canned foods, and hard cheeses are often safe past this date if they look, smell, and taste fine.
+- **Safety Check**: Look for discoloration, off-putting odors, mold, or slimy texture. When in doubt, compost or discard.`;
+    }
+    if (msg.includes("freeze") || msg.includes("freezer")) {
+      return `### \u2744\uFE0F Smart Freezing Tips
+
+- **Bread & Pastries**: Slice first, store in airtight bags. Toast directly from frozen.
+- **Hard Cheeses**: Grate before freezing for easy sprinkling on pastas and bakes.
+- **Berries & Fruits**: Flash freeze on a tray for 2 hours, then bag together to prevent clumping.
+- **Cooked Meals**: Label with today's date; use within 3 months for peak flavor.`;
+    }
+    return `### \u{1F33F} Hello from Chef Remi!
+
+I can help you reduce food waste, verify freshness, estimate shelf life, or craft delicious recipes from whatever is in your fridge.
+
+Try asking:
+- *"What can I cook with what's expiring soon?"*
+- *"How do I keep fresh herbs from wilting?"*
+- *"Can I freeze opened cheese or milk?"*`;
+  }
+  /**
+   * Calls Google Gemini API using native fetch
+   */
+  async callGemini(prompt) {
+    if (!this.apiKey) return null;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+    const payload = {
+      contents: [
+        {
+          parts: [{ text: prompt }]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 1200
+      }
+    };
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini API error (${res.status}): ${errText}`);
+    }
+    const data = await res.json();
+    const candidate = data.candidates?.[0];
+    const text = candidate?.content?.parts?.[0]?.text;
+    return text || null;
+  }
+  /**
+   * Helper to strip markdown code fences and parse JSON
+   */
+  parseJsonFromMarkdown(text) {
+    try {
+      const clean = text.replace(/^```json/m, "").replace(/^```/m, "").replace(/```$/m, "").trim();
+      return JSON.parse(clean);
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Generates dynamic, realistic zero-waste recipes when Gemini is offline
+   */
+  generateHeuristicRecipes(items, mealType) {
+    const mainNames = items.slice(0, 4).map((i) => i.name);
+    const expiring = items.filter((i) => (i.daysLeft ?? 10) <= 4).map((i) => i.name);
+    const highlightedItems = expiring.length > 0 ? expiring : mainNames;
+    return [
+      {
+        id: "recipe-zero-waste-skillet",
+        title: "Golden Farmhouse Saut\xE9 & Scramble",
+        description: `A quick, vibrant skillet dish specifically crafted to utilize your ${highlightedItems.slice(0, 2).join(" and ")} before they spoil.`,
+        prepTime: "10 mins",
+        cookTime: "12 mins",
+        difficulty: "Easy",
+        servings: 2,
+        expiringIngredientsUsed: highlightedItems.slice(0, 3),
+        additionalPantryItems: ["2 Eggs or Tofu", "Olive Oil", "Black Pepper", "Minced Garlic"],
+        instructions: [
+          `Chop your ${highlightedItems.slice(0, 2).join(" and ")} into bite-sized, even pieces.`,
+          "Heat 1 tablespoon of olive oil in a non-stick skillet over medium-high heat with minced garlic until fragrant.",
+          `Add the ${highlightedItems[0] || "vegetables"} and saut\xE9 for 4-5 minutes until tender and golden.`,
+          "Whisk 2 eggs or add crumbled tofu, pour evenly across the skillet, season with salt and pepper, and stir gently until fluffy and cooked through.",
+          "Serve warm with toasted bread or your favorite grain."
+        ],
+        nutritionalHighlight: "High protein, rich in dietary fiber and essential micronutrients."
+      },
+      {
+        id: "recipe-zero-waste-bowl",
+        title: "Chef's Garden Grain & Power Bowl",
+        description: "A nourishing, customizable bowl combining saut\xE9ed ingredients over rice, quinoa, or noodles.",
+        prepTime: "12 mins",
+        cookTime: "15 mins",
+        difficulty: "Easy",
+        servings: 2,
+        expiringIngredientsUsed: highlightedItems.slice(0, 2),
+        additionalPantryItems: ["Cooked Rice or Grains", "Soy Sauce or Dressing", "Sesame Seeds", "Chili Flakes"],
+        instructions: [
+          "Warm pre-cooked rice or grains in a serving bowl.",
+          `Quickly sear ${highlightedItems.join(", ")} in a hot pan with a splash of soy sauce or olive oil.`,
+          "Layer the cooked ingredients over the warm grains.",
+          "Drizzle with sesame oil or vinaigrette and garnish with toasted sesame seeds and chili flakes."
+        ],
+        nutritionalHighlight: "Sustained clean energy with complex carbohydrates."
+      }
+    ];
+  }
+};
+var aiService = new AIService();
+
 // server/routes.ts
 function hashPassword(password) {
   return createHash("sha256").update(password).digest("hex");
@@ -2409,23 +2587,24 @@ function verifyPassword(password, hash) {
   return hashPassword(password) === hash;
 }
 async function registerRoutes(app2) {
-  app2.get("/api/health", (req, res) => {
+  const healthCheck = (req, res) => {
+    if (req.headers["user-agent"]?.includes("UptimeRobot")) {
+      console.log(`[Monitor] \u{1F916} UptimeRobot hit: ${req.method} ${req.originalUrl}`);
+    }
     res.status(200).json({
       status: "ok",
-      message: "API is working",
+      uptime: Math.floor(process.uptime()),
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      services: {
-        email: emailService.isConfigured(),
-        whatsapp: whatsappService.isConfigured(),
-        whatsappCloud: whatsappCloudService.isConfigured(),
-        telegram: telegramService.isConfigured(),
-        push: pushService.isConfigured()
-      },
-      cors: {
-        origin: req.headers.origin || "none",
-        host: req.headers.host
-      }
+      node: process.version,
+      memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + "MB"
     });
+  };
+  const monitorPaths = ["/api/health", "/health", "/api/ping", "/ping", "/api/keep-alive", "/keep-alive"];
+  app2.get("/api", healthCheck);
+  app2.head("/api", healthCheck);
+  monitorPaths.forEach((path2) => {
+    app2.get(path2, healthCheck);
+    app2.head(path2, healthCheck);
   });
   app2.get("/api/dashboard/:userId", async (req, res) => {
     try {
@@ -2477,7 +2656,6 @@ async function registerRoutes(app2) {
     });
   });
   app2.post("/api/auth/register", async (req, res) => {
-    console.log("[Auth] Registration request received");
     try {
       const validatedData = insertUserSchema.parse(req.body);
       let mobile = validatedData.mobile.trim();
@@ -2523,7 +2701,6 @@ async function registerRoutes(app2) {
     }
   });
   app2.post("/api/auth/login", async (req, res) => {
-    console.log("[Auth] Login request received");
     try {
       const validatedData = loginSchema.parse(req.body);
       let identifier = validatedData.identifier.trim();
@@ -2748,6 +2925,77 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("[FoodItems] Delete item error:", error);
       res.status(500).json({ message: "Failed to delete food item" });
+    }
+  });
+  app2.post("/api/ai/predict-shelf-life", async (req, res) => {
+    try {
+      const { foodName, category } = req.body;
+      if (!foodName || typeof foodName !== "string") {
+        return res.status(400).json({ message: "Food name is required" });
+      }
+      const prediction = await aiService.predictShelfLife(foodName, category);
+      res.status(200).json({ success: true, prediction });
+    } catch (error) {
+      console.error("[AI] Shelf-life prediction error:", error);
+      res.status(500).json({ message: "Failed to predict shelf life", error: error?.message });
+    }
+  });
+  app2.post("/api/ai/recipes", async (req, res) => {
+    try {
+      const { userId, items: providedItems, preferences } = req.body;
+      let inventory = providedItems;
+      if (!inventory && userId) {
+        const dbItems = await storage.getFoodItemsByUserId(userId);
+        const today = /* @__PURE__ */ new Date();
+        today.setHours(0, 0, 0, 0);
+        inventory = dbItems.map((item) => {
+          const exp = new Date(item.expiryDate);
+          exp.setHours(0, 0, 0, 0);
+          const daysLeft = Math.ceil((exp.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
+          return {
+            name: item.name,
+            category: item.category,
+            daysLeft,
+            quantity: item.quantity
+          };
+        });
+      }
+      if (!inventory || !Array.isArray(inventory)) {
+        inventory = [];
+      }
+      const recipes = await aiService.generateRecipes(inventory, preferences);
+      res.status(200).json({ success: true, recipes });
+    } catch (error) {
+      console.error("[AI] Recipe generation error:", error);
+      res.status(500).json({ message: "Failed to generate recipes", error: error?.message });
+    }
+  });
+  app2.post("/api/ai/assistant", async (req, res) => {
+    try {
+      const { message, userId, items: providedItems } = req.body;
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ message: "Message is required" });
+      }
+      let inventory = providedItems;
+      if (!inventory && userId) {
+        const dbItems = await storage.getFoodItemsByUserId(userId);
+        const today = /* @__PURE__ */ new Date();
+        today.setHours(0, 0, 0, 0);
+        inventory = dbItems.map((item) => {
+          const exp = new Date(item.expiryDate);
+          exp.setHours(0, 0, 0, 0);
+          const daysLeft = Math.ceil((exp.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
+          return {
+            name: item.name,
+            daysLeft
+          };
+        });
+      }
+      const reply = await aiService.chatWithAssistant(message, inventory || []);
+      res.status(200).json({ success: true, reply });
+    } catch (error) {
+      console.error("[AI] Assistant chat error:", error);
+      res.status(500).json({ message: "Failed to generate response", error: error?.message });
     }
   });
   app2.get("/api/notifications/preferences/:userId", async (req, res) => {
@@ -3051,17 +3299,6 @@ async function registerRoutes(app2) {
   return httpServer;
 }
 
-// server/utils.ts
-function log(message, source = "express") {
-  const formattedTime = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true
-  });
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-
 // server/notificationScheduler.ts
 import cron from "node-cron";
 var NotificationScheduler = class {
@@ -3178,8 +3415,6 @@ var NotificationScheduler = class {
 var notificationScheduler = new NotificationScheduler();
 
 // server/index.ts
-import fs3 from "fs";
-import path4 from "path";
 var app = express2();
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -3236,91 +3471,78 @@ app.use((req, res, next) => {
   });
   next();
 });
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[System] \u274C Unhandled Rejection at:", promise, "reason:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[System] \u274C Uncaught Exception:", err);
+});
 var servicesInitialized = false;
 function initializeServices() {
   if (servicesInitialized) return;
   servicesInitialized = true;
-  log("Initializing notification services...");
+  const isVercel = process.env.VERCEL === "1";
+  log(`Initializing services (Vercel: ${isVercel})...`);
   const emailInitialized = emailService.initialize();
   const whatsappInitialized = whatsappService.initialize();
   const whatsappCloudInitialized = whatsappCloudService.initialize();
   const smsInitialized = smsService.initialize();
   const telegramInitialized = telegramService.initialize();
   const pushInitialized = pushService.initialize();
-  if (emailInitialized) {
-    log("\u2713 Email notifications enabled");
-  } else {
-    log("\u26A0 Email notifications disabled (configure EMAIL_* or RESEND_API_KEY environment variables)");
-  }
-  if (whatsappInitialized) {
-    log("\u2713 WhatsApp notifications enabled (Twilio)");
-  } else if (whatsappCloudInitialized) {
-    log("\u2713 WhatsApp notifications enabled (FREE Cloud API)");
-  } else {
-    log("\u26A0 WhatsApp notifications disabled (configure TWILIO_* or WHATSAPP_CLOUD_* environment variables)");
-  }
-  if (smsInitialized) {
-    log("\u2713 SMS notifications enabled");
-  } else {
-    log("\u26A0 SMS notifications disabled (configure TWILIO_* environment variables)");
-  }
-  if (telegramInitialized) {
-    log("\u2713 Telegram notifications enabled");
-  } else {
-    log("\u26A0 Telegram notifications disabled (configure TELEGRAM_BOT_TOKEN environment variable)");
-  }
-  if (pushInitialized) {
-    log("\u2713 Push notifications enabled");
-  } else {
-    log("\u26A0 Push notifications disabled (configure VAPID_KEYs)");
-  }
-  const autoSchedule = process.env.NOTIFICATION_AUTO_SCHEDULE !== "false";
-  if (autoSchedule && (emailInitialized || whatsappInitialized || smsInitialized || telegramInitialized || pushInitialized)) {
-    try {
-      notificationScheduler.start();
-      log("\u2713 Notification scheduler started");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`\u26A0 Failed to start notification scheduler: ${errorMessage}`);
+  if (!isVercel) {
+    const autoSchedule = process.env.NOTIFICATION_AUTO_SCHEDULE !== "false";
+    if (autoSchedule && (emailInitialized || whatsappInitialized || smsInitialized || telegramInitialized || pushInitialized)) {
+      try {
+        notificationScheduler.start();
+        log("\u2713 Notification scheduler started");
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        log(`\u26A0 Failed to start notification scheduler: ${errorMessage}`);
+      }
     }
-  } else if (!autoSchedule) {
-    log("\u2139 Automatic notification scheduling disabled (set NOTIFICATION_AUTO_SCHEDULE=true to enable)");
+  } else {
+    log("\u2139 Notification scheduler disabled (running on Vercel)");
   }
 }
-(async () => {
-  initializeServices();
-  const server = await registerRoutes(app);
-  const isProduction = process.env.NODE_ENV === "production";
-  const isBuilt = import.meta.filename?.endsWith(".js") || false;
-  const isDevelopment = !isProduction && (process.env["npm_lifecycle_event"] === "dev" || !isBuilt);
-  log(`[System] NODE_ENV: ${process.env.NODE_ENV}`);
-  log(`[System] Running in ${isDevelopment ? "DEVELOPMENT" : "PRODUCTION"} mode`);
-  if (isDevelopment) {
-    const { setupVite: setupVite2 } = await init_vite().then(() => vite_exports);
-    await setupVite2(app, server);
-  } else {
-    const distPath = path4.resolve(import.meta.dirname, "..", "dist");
-    const indexPath = path4.resolve(distPath, "index.html");
-    if (!fs3.existsSync(indexPath)) {
-      log(`[System] \u26A0\uFE0F  WARNING: Production build not found at ${distPath}`);
-      log(`[System] \u26A0\uFE0F  Ensure 'npm run build' ran successfully.`);
+var routesPromise = (async () => {
+  try {
+    initializeServices();
+    await registerRoutes(app);
+    const isProduction = process.env.NODE_ENV === "production";
+    const isVercel = process.env.VERCEL === "1";
+    if (!isVercel) {
+      const { serveStatic: serveStatic2 } = await Promise.resolve().then(() => (init_static(), static_exports));
+      serveStatic2(app);
     }
-    const { serveStatic: serveStatic2 } = await Promise.resolve().then(() => (init_static(), static_exports));
-    serveStatic2(app);
-  }
-  app.use((err, _req, res, _next) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    res.status(status).json({ message });
-    throw err;
-  });
-  if (process.env.VERCEL !== "1") {
-    const port = parseInt(process.env.PORT || "5000", 10);
-    server.listen(port, "0.0.0.0", () => {
-      log(`serving on port ${port}`);
+    app.use((err, _req, res, _next) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      console.error(`[Error] ${status}: ${message}`, err);
+      res.status(status).json({ message });
     });
+    log("\u2705 API Initialization complete");
+  } catch (error) {
+    console.error("\u274C Failed to initialize API routes:", error);
   }
 })();
+app.use(async (req, res, next) => {
+  await routesPromise;
+  next();
+});
+if (process.env.VERCEL !== "1") {
+  (async () => {
+    try {
+      await routesPromise;
+      const server = createServer2(app);
+      const port = parseInt(process.env.PORT || "5000", 10);
+      server.listen(port, "0.0.0.0", () => {
+        log(`serving on port ${port}`);
+      });
+    } catch (error) {
+      console.error("[System] \u274C Failed to start server:", error);
+    }
+  })();
+}
 var index_default = app;
 export {
   index_default as default

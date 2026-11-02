@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X, User, HelpCircle } from "lucide-react";
+import { Menu, X, User, HelpCircle, Sparkles, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ interface NavbarProps {
   onLoginClick?: () => void;
   onRegisterClick?: () => void;
   onLogoutClick?: () => void;
+  onOpenRecipes?: () => void;
 }
 
 export function Navbar({
@@ -20,11 +21,12 @@ export function Navbar({
   onLoginClick,
   onRegisterClick,
   onLogoutClick,
+  onOpenRecipes,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Prefetch dashboard data on hover for instant loading
+  // Prefetch dashboard data on hover for instant navigation
   const handleDashboardHover = () => {
     if (isAuthenticated) {
       const userStr = safeLocalStorage.getItem("user");
@@ -32,9 +34,8 @@ export function Navbar({
         try {
           const user = JSON.parse(userStr);
           queryClient.prefetchQuery({
-            queryKey: ['foodItems', user.id],
+            queryKey: ["foodItems", user.id],
             queryFn: async () => {
-              // Use optimized batch endpoint
               const response = await fetch(`${API_BASE_URL}/api/dashboard/${user.id}`, {
                 credentials: "include",
               });
@@ -52,70 +53,74 @@ export function Navbar({
   };
 
   return (
-    <nav className="sticky top-0 z-50 backdrop-blur-lg bg-background/90 border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
+    <nav className="sticky top-0 z-50 backdrop-blur-md bg-background/85 border-b border-border/50 transition-colors">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 gap-4">
-          <Link href="/" className="flex items-center gap-0 hover-elevate active-elevate-2 px-2 py-1 rounded-md" data-testid="link-home">
-            <motion.div
-              whileHover={{ rotate: 10, scale: 1.1 }}
-              className="mr-2"
-            >
+          {/* Brand Logo */}
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 group cursor-pointer"
+            data-testid="link-home"
+          >
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
               <svg
-                width="40"
-                height="40"
-                viewBox="0 0 40 40"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
                 fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="drop-shadow-sm"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <circle cx="20" cy="20" r="18" fill="url(#logo-grad)" />
-                <path
-                  d="M20 10C14.48 10 10 14.48 10 20C10 25.52 14.48 30 20 30C25.52 30 30 25.52 30 20"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M20 15V20L23 23"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="24" cy="12" r="4" fill="#ef4444" />
-                <path d="M24 8C24.5 9.5 25.5 10 27 10" stroke="white" strokeWidth="1" />
-                <defs>
-                  <linearGradient id="logo-grad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#16a34a" />
-                    <stop offset="1" stopColor="#15803d" />
-                  </linearGradient>
-                </defs>
+                <path d="M12 2v8" />
+                <path d="m4.93 10.93 4.24-4.24" />
+                <path d="M2 18h20" />
+                <path d="M20 18a8 8 0 0 0-16 0" />
               </svg>
-            </motion.div>
-            <span className="text-xl font-bold">Food Reminder</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-base tracking-tight text-foreground">
+                Food Reminder
+              </span>
+              <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                AI
+              </span>
+            </div>
           </Link>
 
-          <div className="hidden md:flex items-center gap-6">
-            {isAuthenticated && (
+          {/* Desktop Center Links */}
+          <div className="hidden md:flex items-center gap-1">
+            {isAuthenticated ? (
               <>
                 <Link
                   href="/dashboard"
-                  className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md"
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex items-center gap-1.5"
                   data-testid="link-dashboard"
                   onMouseEnter={handleDashboardHover}
                 >
+                  <LayoutDashboard className="w-3.5 h-3.5" />
                   Dashboard
                 </Link>
-                <Link href="/profile" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md flex items-center gap-2" data-testid="link-profile">
-                  <User className="w-4 h-4" />
+                {onOpenRecipes && (
+                  <button
+                    onClick={onOpenRecipes}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    AI Recipes
+                  </button>
+                )}
+                <Link
+                  href="/profile"
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex items-center gap-1.5"
+                  data-testid="link-profile"
+                >
+                  <User className="w-3.5 h-3.5" />
                   Profile
                 </Link>
               </>
-            )}
-          </div>
-
-          <div className="hidden md:flex items-center gap-3">
-            {!isAuthenticated && (
+            ) : (
               <>
                 <Link
                   href="/"
@@ -126,68 +131,132 @@ export function Navbar({
                       document.getElementById("about")?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md"
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                   data-testid="link-about"
                 >
-                  About
+                  Features
                 </Link>
-                <Link href="/help-contact" className="text-sm font-medium hover-elevate active-elevate-2 px-3 py-2 rounded-md flex items-center gap-2" data-testid="link-help">
-                  <HelpCircle className="w-4 h-4" />
-                  Help
+                <Link
+                  href="/help-contact"
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex items-center gap-1.5"
+                  data-testid="link-help"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  Support
                 </Link>
               </>
             )}
+          </div>
+
+          {/* Desktop Right Actions */}
+          <div className="hidden md:flex items-center gap-2.5">
             <ThemeToggle />
             {!isAuthenticated ? (
-              <>
-                <Button variant="ghost" onClick={onLoginClick} data-testid="button-login">
-                  Login
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onLoginClick}
+                  className="text-xs h-8 rounded-lg"
+                  data-testid="button-login"
+                >
+                  Sign In
                 </Button>
-                <Button onClick={onRegisterClick} data-testid="button-register">
+                <Button
+                  size="sm"
+                  onClick={onRegisterClick}
+                  className="text-xs h-8 rounded-lg"
+                  data-testid="button-register"
+                >
                   Get Started
                 </Button>
-              </>
+              </div>
             ) : (
-              <Button variant="ghost" onClick={onLogoutClick} data-testid="button-logout">
-                Logout
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onLogoutClick}
+                className="text-xs h-8 rounded-lg"
+                data-testid="button-logout"
+              >
+                Sign Out
               </Button>
             )}
           </div>
 
+          {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
             <ThemeToggle />
             <Button
               variant="ghost"
               size="icon"
+              className="h-8 w-8"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               data-testid="button-mobile-menu"
             >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
           </div>
         </div>
 
+        {/* Mobile Dropdown */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
-              className="md:hidden border-t py-4 space-y-2"
+              className="md:hidden border-t py-3 space-y-1.5"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.2 }}
             >
-              {isAuthenticated && (
+              {isAuthenticated ? (
                 <>
-                  <Link href="/dashboard" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2" data-testid="link-dashboard-mobile">
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium hover:bg-muted"
+                    data-testid="link-dashboard-mobile"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
                     Dashboard
                   </Link>
-                  <Link href="/profile" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2 flex items-center gap-2" data-testid="link-profile-mobile">
+                  {onOpenRecipes && (
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onOpenRecipes();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-primary hover:bg-primary/10"
+                    >
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      AI Recipes
+                    </button>
+                  )}
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium hover:bg-muted"
+                    data-testid="link-profile-mobile"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
                     <User className="w-4 h-4" />
                     Profile
                   </Link>
+                  <div className="pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs h-8"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onLogoutClick?.();
+                      }}
+                      data-testid="button-logout-mobile"
+                    >
+                      Sign Out
+                    </Button>
+                  </div>
                 </>
-              )}
-              {!isAuthenticated && (
+              ) : (
                 <>
                   <Link
                     href="/"
@@ -199,33 +268,47 @@ export function Navbar({
                         document.getElementById("about")?.scrollIntoView({ behavior: "smooth" });
                       }, 100);
                     }}
-                    className="block px-3 py-2 rounded-md hover-elevate active-elevate-2"
+                    className="block px-3 py-2 rounded-lg text-xs font-medium hover:bg-muted"
                     data-testid="link-about-mobile"
                   >
-                    About
+                    Features
                   </Link>
-                  <Link href="/help-contact" className="block px-3 py-2 rounded-md hover-elevate active-elevate-2 flex items-center gap-2" data-testid="link-help-mobile">
+                  <Link
+                    href="/help-contact"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium hover:bg-muted"
+                    data-testid="link-help-mobile"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
                     <HelpCircle className="w-4 h-4" />
-                    Help & Contact
+                    Support
                   </Link>
-                </>
-              )}
-              <div className="pt-2 space-y-2">
-                {!isAuthenticated ? (
-                  <>
-                    <Button variant="ghost" className="w-full" onClick={onLoginClick} data-testid="button-login-mobile">
-                      Login
+                  <div className="pt-2 space-y-1.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs h-8"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onLoginClick?.();
+                      }}
+                      data-testid="button-login-mobile"
+                    >
+                      Sign In
                     </Button>
-                    <Button className="w-full" onClick={onRegisterClick} data-testid="button-register-mobile">
+                    <Button
+                      size="sm"
+                      className="w-full text-xs h-8"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onRegisterClick?.();
+                      }}
+                      data-testid="button-register-mobile"
+                    >
                       Get Started
                     </Button>
-                  </>
-                ) : (
-                  <Button variant="ghost" className="w-full" onClick={onLogoutClick} data-testid="button-logout-mobile">
-                    Logout
-                  </Button>
-                )}
-              </div>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

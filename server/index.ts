@@ -153,7 +153,7 @@ const routesPromise = (async () => {
     const isProduction = process.env.NODE_ENV === "production";
     const isVercel = process.env.VERCEL === "1";
 
-    if (isProduction && !isVercel) {
+    if (!isVercel) {
       const { serveStatic } = await import("./static");
       serveStatic(app);
     }

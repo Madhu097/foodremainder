@@ -12,6 +12,7 @@ import { smsService } from "./smsService";
 import { telegramService } from "./telegramService";
 import { pushService } from "./pushService";
 import { notificationChecker } from "./notificationChecker";
+import { aiService } from "./aiService";
 
 // Simple password hashing (in production, use bcrypt)
 function hashPassword(password: string): string {
@@ -498,6 +499,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[FoodItems] Delete item error:", error);
       res.status(500).json({ message: "Failed to delete food item" });
+    }
+  });
+
+  
+  // ===== AI SERVICES ROUTES =====
+
+  // Smart shelf life and storage advice prediction
+  app.post("/api/ai/predict-shelf-life", async (req: Request, res: Response) => {
+    try {
+      const { foodName, category } = req.body;
+      if (!foodName || typeof foodName !== "string") {
+        return res.status(400).json({ message: "Food name is required" });
+      }
+
+      const prediction = await aiService.predictShelfLife(foodName, category);
+      res.status(200).json({ success: true, prediction });
+    } catch (error: any) {
+      console.error("[AI] Shelf-life prediction error:", error);
+      res.status(500).json({ message: "Failed to predict shelf life", error: error?.message });
+    }
+  });
+
+  // Zero-waste recipe generation from expiring or available food items
+  app.post("/api/ai/recipes", async (req: Request, res: Response) => {
+    try {
+      const { userId, items: providedItems, preferences } = req.body;
+      let inventory = providedItems;
+
+      if (!inventory && userId) {
+        const dbItems = await storage.getFoodItemsByUserId(userId);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        inventory = dbItems.map(item => {
+          const exp = new Date(item.expiryDate);
+          exp.setHours(0, 0, 0, 0);
+          const daysLeft = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            name: item.name,
+            category: item.category,
+            daysLeft,
+            quantity: item.quantity,
+          };
+        });
+      }
+
+      if (!inventory || !Array.isArray(inventory)) {
+        inventory = [];
+      }
+
+      const recipes = await aiService.generateRecipes(inventory, preferences);
+      res.status(200).json({ success: true, recipes });
+    } catch (error: any) {
+      console.error("[AI] Recipe generation error:", error);
+      res.status(500).json({ message: "Failed to generate recipes", error: error?.message });
+    }
+  });
+
+  // Interactive AI Chef assistant chat
+  app.post("/api/ai/assistant", async (req: Request, res: Response) => {
+    try {
+      const { message, userId, items: providedItems } = req.body;
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      let inventory = providedItems;
+      if (!inventory && userId) {
+        const dbItems = await storage.getFoodItemsByUserId(userId);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        inventory = dbItems.map(item => {
+          const exp = new Date(item.expiryDate);
+          exp.setHours(0, 0, 0, 0);
+          const daysLeft = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            name: item.name,
+            daysLeft,
+          };
+        });
+      }
+
+      const reply = await aiService.chatWithAssistant(message, inventory || []);
+      res.status(200).json({ success: true, reply });
+    } catch (error: any) {
+      console.error("[AI] Assistant chat error:", error);
+      res.status(500).json({ message: "Failed to generate response", error: error?.message });
     }
   });
 
