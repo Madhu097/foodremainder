@@ -2,11 +2,11 @@
  * AI Service for Food Reminder
  * Provides:
  * 1. Smart Shelf-Life & Expiration Prediction
- * 2. Zero-Waste Recipe Generation from expiring items
- * 3. AI Kitchen & Preservation Assistant (Chef Bot)
+ * 2. High-Accuracy Zero-Waste Recipe Generation strictly matching inventory products
+ * 3. AI Kitchen & Preservation Assistant (Chef Remi)
  * 
  * Supports Google Gemini API (GEMINI_API_KEY / GOOGLE_API_KEY) with
- * an intelligent offline culinary knowledge engine fallback for 100% uptime.
+ * an intelligent, culinary-accurate knowledge engine fallback for 100% uptime.
  */
 
 export interface ShelfLifePrediction {
@@ -39,7 +39,7 @@ export interface FoodInventoryContext {
   quantity?: string | null;
 }
 
-// Built-in intelligent food shelf-life & storage knowledge base (offline fallback)
+// Built-in intelligent food shelf-life & storage knowledge base
 const FOOD_KNOWLEDGE_BASE: Record<string, { category: string; shelfLifeDays: number; storage: "fridge" | "pantry" | "freezer"; tips: string }> = {
   // Dairy
   milk: { category: "Dairy", shelfLifeDays: 7, storage: "fridge", tips: "Keep in the main fridge body, not the door where temperature fluctuates." },
@@ -48,6 +48,7 @@ const FOOD_KNOWLEDGE_BASE: Record<string, { category: string; shelfLifeDays: num
   butter: { category: "Dairy", shelfLifeDays: 60, storage: "fridge", tips: "Can be frozen for up to 9 months if unopened." },
   cream: { category: "Dairy", shelfLifeDays: 10, storage: "fridge", tips: "Use within 7-10 days after opening." },
   paneer: { category: "Dairy", shelfLifeDays: 5, storage: "fridge", tips: "Submerge in fresh water in an airtight container to keep moist." },
+  egg: { category: "Dairy", shelfLifeDays: 28, storage: "fridge", tips: "Keep in carton in main fridge shelf, not on door rack." },
 
   // Fruits
   banana: { category: "Fruits", shelfLifeDays: 5, storage: "pantry", tips: "Store away from other fruits to prevent rapid ripening from ethylene gas." },
@@ -59,6 +60,8 @@ const FOOD_KNOWLEDGE_BASE: Record<string, { category: string; shelfLifeDays: num
   avocado: { category: "Fruits", shelfLifeDays: 4, storage: "pantry", tips: "Ripen on counter, then move to fridge to prolong freshness by 3-5 days." },
   tomato: { category: "Fruits", shelfLifeDays: 7, storage: "pantry", tips: "Store stem-side down at room temp. Refrigeration ruins texture and flavor." },
   mango: { category: "Fruits", shelfLifeDays: 6, storage: "pantry", tips: "Keep at room temp until soft and fragrant, then refrigerate." },
+  watermelon: { category: "Fruits", shelfLifeDays: 7, storage: "fridge", tips: "Cover cut surfaces tightly with cling film and keep chilled." },
+  grapes: { category: "Fruits", shelfLifeDays: 10, storage: "fridge", tips: "Keep in original perforated bag in produce drawer; wash before eating." },
 
   // Vegetables
   spinach: { category: "Vegetables", shelfLifeDays: 5, storage: "fridge", tips: "Place a dry paper towel in the box to absorb excess moisture." },
@@ -70,7 +73,10 @@ const FOOD_KNOWLEDGE_BASE: Record<string, { category: string; shelfLifeDays: num
   broccoli: { category: "Vegetables", shelfLifeDays: 7, storage: "fridge", tips: "Mist heads loosely or wrap in damp paper towel." },
   cucumber: { category: "Vegetables", shelfLifeDays: 7, storage: "fridge", tips: "Sensitive to cold; keep near front of fridge or warm zone." },
   bell_pepper: { category: "Vegetables", shelfLifeDays: 10, storage: "fridge", tips: "Keep whole and dry in crisper drawer." },
+  capsicum: { category: "Vegetables", shelfLifeDays: 10, storage: "fridge", tips: "Store whole in produce drawer with low humidity." },
   mushroom: { category: "Vegetables", shelfLifeDays: 6, storage: "fridge", tips: "Keep in original brown paper bag to let moisture escape." },
+  cabbage: { category: "Vegetables", shelfLifeDays: 21, storage: "fridge", tips: "Keep whole head unwashed in crisper drawer." },
+  cauliflower: { category: "Vegetables", shelfLifeDays: 10, storage: "fridge", tips: "Store stem-side up in a perforated bag to prevent condensation." },
 
   // Meat & Seafood
   chicken: { category: "Meat", shelfLifeDays: 2, storage: "fridge", tips: "Keep on lowest fridge shelf to avoid drips. Freeze if not cooking within 48h." },
@@ -78,7 +84,6 @@ const FOOD_KNOWLEDGE_BASE: Record<string, { category: string; shelfLifeDays: num
   fish: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Cook within 24-48 hours or freeze immediately." },
   salmon: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Keep on a bed of ice or in the coldest corner of the fridge." },
   prawns: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Thaw slowly in fridge, cook promptly." },
-  egg: { category: "Dairy", shelfLifeDays: 28, storage: "fridge", tips: "Keep in carton in main fridge shelf, not on door rack." },
 
   // Grains & Bakery
   bread: { category: "Grains", shelfLifeDays: 6, storage: "pantry", tips: "Avoid fridge (causes staling). Slice and freeze for long-term storage." },
@@ -87,6 +92,30 @@ const FOOD_KNOWLEDGE_BASE: Record<string, { category: string; shelfLifeDays: num
   flour: { category: "Grains", shelfLifeDays: 240, storage: "pantry", tips: "Seal tightly in container to prevent pantry bugs." },
   oats: { category: "Grains", shelfLifeDays: 180, storage: "pantry", tips: "Keep cool and dry. Ideal container prevents humidity absorption." },
 };
+
+type FoodCategoryType = "fruit" | "vegetable" | "dairy" | "meat" | "grain" | "other";
+
+function classifyIngredient(name: string, category?: string): FoodCategoryType {
+  const n = name.toLowerCase();
+  const c = (category || "").toLowerCase();
+
+  if (c.includes("fruit") || /banana|apple|strawberry|berry|berries|blueberry|raspberry|orange|mango|pineapple|watermelon|melon|grape|peach|pear|plum|kiwi|papaya|lemon|lime|avocado|cherry|dates|figs/.test(n)) {
+    return "fruit";
+  }
+  if (c.includes("dairy") || /milk|cheese|yogurt|curd|paneer|butter|cream|cottage cheese|mozzarella|cheddar|parmesan|ghee/.test(n)) {
+    return "dairy";
+  }
+  if (c.includes("meat") || c.includes("seafood") || /chicken|fish|salmon|tuna|shrimp|prawn|egg|eggs|beef|pork|mutton|lamb|bacon|sausage|turkey|tofu/.test(n)) {
+    return "meat";
+  }
+  if (c.includes("veg") || /tomato|potato|onion|garlic|carrot|broccoli|spinach|lettuce|cabbage|cauliflower|bell pepper|capsicum|mushroom|cucumber|zucchini|ginger|chili|peas|corn|celery|beans|kale|brinjal|eggplant/.test(n)) {
+    return "vegetable";
+  }
+  if (c.includes("grain") || c.includes("bakery") || /bread|rice|pasta|noodle|noodles|oat|oats|oatmeal|flour|tortilla|roti|chapati|bun|toast|cereal/.test(n)) {
+    return "grain";
+  }
+  return "other";
+}
 
 class AIService {
   private apiKey: string | null = null;
@@ -105,16 +134,16 @@ class AIService {
   async predictShelfLife(foodName: string, userCategory?: string): Promise<ShelfLifePrediction> {
     const cleanName = foodName.toLowerCase().trim();
 
-    // 1. If Gemini API is configured, ask Gemini for nuanced prediction
+    // 1. If Gemini API is configured, ask Gemini
     if (this.hasGeminiKey()) {
       try {
-        const prompt = `As a professional culinary preservation expert, return JSON only for this food item: "${foodName}".
+        const prompt = `As a culinary preservation expert, return JSON only for this food item: "${foodName}".
 Format:
 {
   "category": "Dairy" | "Fruits" | "Vegetables" | "Meat" | "Seafood" | "Grains" | "Beverages" | "Snacks" | "Other",
-  "shelfLifeDays": number (standard fresh refrigerated or pantry shelf-life from purchase date),
+  "shelfLifeDays": number,
   "storageLocation": "fridge" | "pantry" | "freezer",
-  "storageTips": "One short, practical sentence on best storage method to maximize freshness."
+  "storageTips": "Short practical sentence on best storage method."
 }`;
 
         const response = await this.callGemini(prompt);
@@ -136,7 +165,7 @@ Format:
       }
     }
 
-    // 2. Intelligent Knowledge Base lookup & matching
+    // 2. Intelligent Knowledge Base lookup
     for (const [key, value] of Object.entries(FOOD_KNOWLEDGE_BASE)) {
       if (cleanName.includes(key) || key.includes(cleanName)) {
         return {
@@ -150,7 +179,7 @@ Format:
       }
     }
 
-    // 3. Category-based heuristic estimation
+    // 3. Category heuristic
     const cat = (userCategory || "").toLowerCase();
     if (cat.includes("dairy")) {
       return { foodName, category: "Dairy", shelfLifeDays: 7, storageLocation: "fridge", storageTips: "Store in coldest section of the refrigerator.", confidence: 0.75 };
@@ -171,7 +200,6 @@ Format:
       return { foodName, category: "Grains", shelfLifeDays: 14, storageLocation: "pantry", storageTips: "Store in an airtight container away from moisture.", confidence: 0.7 };
     }
 
-    // General default
     return {
       foodName,
       category: userCategory || "Other",
@@ -183,45 +211,55 @@ Format:
   }
 
   /**
-   * Generate creative, delicious zero-waste recipes prioritizing expiring foods
+   * Generate zero-waste recipes strictly prioritizing the user's available and expiring foods
    */
   async generateRecipes(
     items: FoodInventoryContext[],
     preferences?: { mealType?: string; dietaryRestrictions?: string }
   ): Promise<GeneratedRecipe[]> {
-    const expiringItems = items
-      .filter((i) => (i.daysLeft !== undefined ? i.daysLeft <= 4 : true))
-      .slice(0, 8);
-    const availableNames = items.map((i) => i.name).slice(0, 15);
+    if (!items || items.length === 0) {
+      return [];
+    }
+
+    // Sort items so expiring items come first
+    const sortedItems = [...items].sort((a, b) => (a.daysLeft ?? 99) - (b.daysLeft ?? 99));
+    const availableNames = sortedItems.map((i) => i.name).slice(0, 15);
+    const expiringItems = sortedItems.filter((i) => (i.daysLeft !== undefined ? i.daysLeft <= 4 : true));
 
     // 1. Try Gemini generation if configured
-    if (this.hasGeminiKey() && items.length > 0) {
+    if (this.hasGeminiKey()) {
       try {
-        const prompt = `You are an expert zero-waste chef and nutritionist.
-The user has the following food items in their kitchen:
+        const prompt = `You are an expert master chef specialized in zero-waste cooking.
+The user has these EXACT food items in their kitchen:
 All Items: ${availableNames.join(", ")}
-Expiring Soon: ${expiringItems.map((i) => `${i.name} (${i.daysLeft ?? "unknown"} days left)`).join(", ")}
+Expiring Soonest: ${expiringItems.map((i) => `${i.name} (${i.daysLeft ?? "?"} days left)`).join(", ")}
 Preferences: Meal type: ${preferences?.mealType || "any"}, Dietary: ${preferences?.dietaryRestrictions || "none"}
 
-Generate 2-3 delicious, creative recipes that MAXIMIZE the use of the expiring ingredients.
+CRITICAL CULINARY RULES:
+1. ONLY generate recipes whose flavor combinations make genuine culinary sense. NEVER mix incompatible items (e.g. NEVER put bananas, strawberries, or milk into garlic-egg stir-fries or savory soy-sauce vegetable bowls).
+2. If the user has sweet items (fruits, sweet dairy, oats, bread), create delicious sweet/breakfast dishes (smoothies, fruit bowls, baked toast, parfaits).
+3. If the user has savory items (vegetables, proteins, grains, garlic, tomatoes), create savory dishes (sauté, stir-fry, curry, soup, pasta, grain bowl).
+4. In "expiringIngredientsUsed", ONLY list names that appear in the user's list.
+5. In "instructions", explicitly mention the user's exact ingredient names.
+
 Return ONLY valid JSON matching this exact structure:
 [
   {
     "id": "recipe-1",
-    "title": "Recipe Name",
-    "description": "Short mouthwatering 1-2 sentence description",
+    "title": "Exact Title Mentioning Key Items",
+    "description": "Short appetizing description highlighting the zero-waste benefits",
     "prepTime": "10 mins",
     "cookTime": "15 mins",
     "difficulty": "Easy" | "Medium" | "Advanced",
     "servings": 2,
-    "expiringIngredientsUsed": ["Item 1", "Item 2"],
-    "additionalPantryItems": ["Salt", "Olive oil", "Garlic"],
+    "expiringIngredientsUsed": ["Exact Item 1", "Exact Item 2"],
+    "additionalPantryItems": ["Salt", "Cooking Oil", "Garlic"],
     "instructions": [
       "Step 1...",
       "Step 2...",
       "Step 3..."
     ],
-    "nutritionalHighlight": "Rich in antioxidants and lean protein"
+    "nutritionalHighlight": "High in vitamins and gut-friendly fiber"
   }
 ]`;
 
@@ -237,8 +275,233 @@ Return ONLY valid JSON matching this exact structure:
       }
     }
 
-    // 2. Intelligent Culinary Template fallback
-    return this.generateHeuristicRecipes(items, preferences?.mealType);
+    // 2. High-Accuracy Culinary Heuristic Engine (100% relevant to actual user products)
+    return this.generateSmartCulinaryRecipes(sortedItems, preferences?.mealType);
+  }
+
+  /**
+   * Dynamic, ingredient-accurate zero-waste recipe generator
+   * Matches compatible ingredients together with zero culinary mismatches.
+   */
+  private generateSmartCulinaryRecipes(items: FoodInventoryContext[], mealType?: string): GeneratedRecipe[] {
+    const categorized = items.map(item => ({
+      ...item,
+      type: classifyIngredient(item.name, item.category),
+    }));
+
+    const fruits = categorized.filter(i => i.type === "fruit");
+    const veggies = categorized.filter(i => i.type === "vegetable");
+    const dairy = categorized.filter(i => i.type === "dairy");
+    const meats = categorized.filter(i => i.type === "meat");
+    const grains = categorized.filter(i => i.type === "grain");
+
+    const recipes: GeneratedRecipe[] = [];
+
+    // Helper: format names nicely
+    const joinNames = (arr: (string | { name: string })[]) => {
+      if (arr.length === 0) return "";
+      const names = arr.map(x => typeof x === "string" ? x : x.name);
+      if (names.length === 1) return names[0];
+      if (names.length === 2) return `${names[0]} and ${names[1]}`;
+      return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+    };
+
+    // CLUSTER 1: FRUIT & SWEET BREAKFAST / DESSERT
+    if (fruits.length > 0) {
+      const mainFruits = fruits.slice(0, 3);
+      const usedDairy = dairy.find(d => /milk|yogurt|curd|cream/i.test(d.name));
+      const usedGrain = grains.find(g => /oat|bread|toast/i.test(g.name));
+
+      const ingredientsUsed = mainFruits.map(f => f.name);
+      if (usedDairy) ingredientsUsed.push(usedDairy.name);
+      if (usedGrain) ingredientsUsed.push(usedGrain.name);
+
+      const title = `Fresh ${joinNames(mainFruits)} ${usedDairy ? "Smoothie & Parfait Bowl" : "Antioxidant Fruit Bowl"}`;
+      const instructions = [
+        `Thoroughly wash and prep your ${joinNames(mainFruits)}, peeling or slicing into bite-sized pieces.`,
+        usedDairy 
+          ? `Combine the ${mainFruits[0].name} with chilled ${usedDairy.name} in a blender (or bowl) and blend until velvety smooth.`
+          : `Arrange the freshly cut ${joinNames(mainFruits)} in a clean serving bowl.`,
+        usedGrain
+          ? `Top with ${usedGrain.name} and a light drizzle of honey or maple syrup for natural sweetness and crunch.`
+          : `Garnish with a squeeze of fresh lemon/lime or mint leaves if on hand to brighten the natural flavors.`,
+        "Serve chilled immediately to enjoy maximum vitamin and antioxidant retention."
+      ];
+
+      recipes.push({
+        id: "recipe-fruit-sunshine",
+        title,
+        description: `A vibrant, zero-waste energizing bowl specifically crafted to consume your ${joinNames(mainFruits)} at peak freshness.`,
+        prepTime: "5 mins",
+        cookTime: "0 mins",
+        difficulty: "Easy",
+        servings: 1,
+        expiringIngredientsUsed: ingredientsUsed,
+        additionalPantryItems: ["Honey or Maple Syrup", "Cold Water or Ice", "Pinch of Cinnamon"],
+        instructions,
+        nutritionalHighlight: "Rich in natural vitamin C, potassium, and active enzymes."
+      });
+
+      // Second sweet recipe if bread/oats or another fruit is present
+      if (grains.length > 0 || fruits.length > 1) {
+        const topFruit = fruits[0];
+        const breadOrGrain = grains[0]?.name || "Toasted Bread or Warm Oats";
+        recipes.push({
+          id: "recipe-caramelized-fruit",
+          title: `Warm Caramelized ${topFruit.name} & Golden Crisp Toast`,
+          description: `A comforting, café-style breakfast turning softening ${topFruit.name} into rich, naturally sweet caramelized goodness.`,
+          prepTime: "5 mins",
+          cookTime: "8 mins",
+          difficulty: "Easy",
+          servings: 1,
+          expiringIngredientsUsed: [topFruit.name, ...(grains[0] ? [grains[0].name] : [])],
+          additionalPantryItems: ["1 tbsp Butter or Cooking Oil", "Pinch of Brown Sugar or Honey", "Cinnamon"],
+          instructions: [
+            `Slice your ${topFruit.name} evenly into 1/4-inch rounds or wedges.`,
+            "Melt 1 tbsp butter in a non-stick skillet over medium heat with a pinch of cinnamon.",
+            `Add the sliced ${topFruit.name} and gently sear for 3-4 minutes per side until golden brown and tenderly caramelized.`,
+            `Serve warm spooned generously over ${breadOrGrain}.`
+          ],
+          nutritionalHighlight: "Wholesome natural sweetness with zero processed additives."
+        });
+      }
+    }
+
+    // CLUSTER 2: SAVORY VEGETABLES (STIR-FRY, CURRY, SOUP)
+    if (veggies.length > 0) {
+      const mainVeggies = veggies.slice(0, 4);
+      const usedAromatics = veggies.filter(v => /onion|garlic|ginger/i.test(v.name));
+      const usedProduce = veggies.filter(v => !/onion|garlic|ginger/i.test(v.name));
+      const targetVeggies = usedProduce.length > 0 ? usedProduce : mainVeggies;
+
+      const vegNames = targetVeggies.map(v => v.name);
+      if (usedAromatics.length > 0 && !vegNames.includes(usedAromatics[0].name)) {
+        vegNames.push(usedAromatics[0].name);
+      }
+
+      // 2A: Farmhouse Sauté / Stir-Fry
+      recipes.push({
+        id: "recipe-veg-saute",
+        title: `Farmhouse Sautéed ${joinNames(targetVeggies.slice(0, 2))} with Garlic & Herbs`,
+        description: `A fast, vibrant 10-minute skillet dish highlighting the fresh crunch and natural sweetness of your ${joinNames(targetVeggies.slice(0, 2))}.`,
+        prepTime: "8 mins",
+        cookTime: "10 mins",
+        difficulty: "Easy",
+        servings: 2,
+        expiringIngredientsUsed: vegNames.slice(0, 3),
+        additionalPantryItems: ["1 tbsp Olive Oil or Cooking Oil", "2 Cloves Minced Garlic", "Black Pepper", "Salt"],
+        instructions: [
+          `Wash and slice your ${joinNames(targetVeggies.slice(0, 2))} into even, bite-sized pieces for consistent cooking.`,
+          "Heat cooking oil in a wide skillet over medium-high heat. Add minced garlic and cook for 30 seconds until aromatic.",
+          `Toss in the ${joinNames(targetVeggies.slice(0, 2))} and sauté vigorously for 5-7 minutes until tender-crisp.`,
+          "Season with a pinch of sea salt, freshly ground black pepper, and herbs of choice. Serve immediately as a wholesome side or main."
+        ],
+        nutritionalHighlight: "Packed with dietary fiber, essential electrolytes, and immune-supporting phytonutrients."
+      });
+
+      // 2B: Nourishing Garden Soup or Curry
+      recipes.push({
+        id: "recipe-veg-soup",
+        title: `Simmered Rustic ${joinNames(targetVeggies.slice(0, 2))} Garden Broth`,
+        description: `A soothing, warming zero-waste soup extracting rich savory depth from your simmered vegetables.`,
+        prepTime: "10 mins",
+        cookTime: "18 mins",
+        difficulty: "Easy",
+        servings: 2,
+        expiringIngredientsUsed: vegNames.slice(0, 4),
+        additionalPantryItems: ["2 Cups Vegetable Broth or Water", "Salt & Pepper", "1 tbsp Olive Oil", "Dried Herbs"],
+        instructions: [
+          `Roughly chop the ${joinNames(vegNames.slice(0, 3))}.`,
+          "Heat oil in a medium saucepan, add the chopped vegetables and sweat over medium heat for 4 minutes.",
+          "Pour in 2 cups of hot water or vegetable broth. Bring to a gentle boil, then reduce heat to low and cover.",
+          `Simmer for 12-15 minutes until the ${targetVeggies[0].name} is melt-in-your-mouth tender.`,
+          "Taste and adjust salt and pepper. Serve piping hot with toasted bread or rice."
+        ],
+        nutritionalHighlight: "Deeply hydrating, gut-soothing, and low calorie."
+      });
+    }
+
+    // CLUSTER 3: PROTEIN & MAIN MEAL (MEAT, FISH, EGGS, PANEER, TOFU)
+    if (meats.length > 0) {
+      const protein = meats[0];
+      const pairedVeg = veggies.slice(0, 2);
+      const usedItems = [protein.name, ...pairedVeg.map(v => v.name)];
+
+      recipes.push({
+        id: "recipe-protein-skillet",
+        title: `Pan-Seared Golden ${protein.name} ${pairedVeg.length > 0 ? "with " + joinNames(pairedVeg) : "Chef Skillet"}`,
+        description: `A high-protein, restaurant-grade pan dish ensuring your ${protein.name} is cooked to juicy perfection.`,
+        prepTime: "8 mins",
+        cookTime: "14 mins",
+        difficulty: "Medium",
+        servings: 2,
+        expiringIngredientsUsed: usedItems,
+        additionalPantryItems: ["Cooking Oil or Butter", "Minced Garlic", "Salt & Black Pepper", "Soy Sauce or Lemon"],
+        instructions: [
+          `Pat the ${protein.name} dry with paper towels and season both sides generously with salt and black pepper.`,
+          "Heat 1 tablespoon of oil or butter in a heavy-bottomed skillet over medium-high heat until shimmering.",
+          `Place the ${protein.name} into the pan. Sear undisturbed for 4-6 minutes to form a savory golden crust, then flip.`,
+          pairedVeg.length > 0
+            ? `Add sliced ${joinNames(pairedVeg)} into the perimeter of the pan, cooking alongside the protein until tender and glossy.`
+            : "Baste with pan juices until cooked through.",
+          "Rest for 3 minutes before slicing and serving hot."
+        ],
+        nutritionalHighlight: "Complete high-density protein with essential amino acids."
+      });
+    }
+
+    // CLUSTER 4: GRAINS / PASTA / RICE
+    if (grains.length > 0 && recipes.length < 3) {
+      const grain = grains[0];
+      const companionItems = [...veggies, ...meats, ...dairy].slice(0, 2);
+      const usedItems = [grain.name, ...companionItems.map(c => c.name)];
+
+      recipes.push({
+        id: "recipe-grain-toss",
+        title: `Artisan Tossed ${grain.name} ${companionItems.length > 0 ? "with " + joinNames(companionItems) : "Primavera"}`,
+        description: `The ultimate pantry comfort food, maximizing leftover ${grain.name} into a delicious, savory bowl.`,
+        prepTime: "5 mins",
+        cookTime: "12 mins",
+        difficulty: "Easy",
+        servings: 2,
+        expiringIngredientsUsed: usedItems,
+        additionalPantryItems: ["2 tbsp Olive Oil or Butter", "Minced Garlic", "Chili Flakes", "Salt & Pepper"],
+        instructions: [
+          `Prepare or warm your ${grain.name}.`,
+          companionItems.length > 0
+            ? `In a hot pan with olive oil and garlic, quickly sauté your ${joinNames(companionItems)} for 3-5 minutes until tender.`
+            : "Warm olive oil, minced garlic, and red chili flakes in a pan over medium heat.",
+          `Toss the ${grain.name} directly into the flavorful pan, coating every bite thoroughly.`,
+          "Finish with a pinch of sea salt, black pepper, and serve warm."
+        ],
+        nutritionalHighlight: "Balanced sustained energy with wholesome complex carbohydrates."
+      });
+    }
+
+    // Fallback if single unique item or unrecognized category
+    if (recipes.length === 0) {
+      const primaryItem = items[0]?.name || "Kitchen Fresh Produce";
+      recipes.push({
+        id: "recipe-single-item-skillet",
+        title: `Chef's Quick Seared ${primaryItem} Medley`,
+        description: `A simple, delicious zero-waste preparation tailored specifically to make ${primaryItem} shine.`,
+        prepTime: "5 mins",
+        cookTime: "10 mins",
+        difficulty: "Easy",
+        servings: 1,
+        expiringIngredientsUsed: [primaryItem],
+        additionalPantryItems: ["1 tbsp Olive Oil or Butter", "Salt & Pepper", "Aromatic Herbs or Garlic"],
+        instructions: [
+          `Gently wash and prep your ${primaryItem}.`,
+          "Heat a non-stick pan over medium heat with a drizzle of olive oil or butter.",
+          `Add the ${primaryItem} and cook gently for 5-7 minutes, tossing occasionally until tender and fragrant.`,
+          "Season to taste with salt and black pepper, and enjoy warm."
+        ],
+        nutritionalHighlight: "Wholesome, fresh home-cooked goodness with zero waste."
+      });
+    }
+
+    return recipes.slice(0, 3);
   }
 
   /**
@@ -254,12 +517,12 @@ Return ONLY valid JSON matching this exact structure:
 
     if (this.hasGeminiKey()) {
       try {
-        const prompt = `You are "Chef Remi", a warm, professional, and knowledgeable AI culinary assistant for the Food Reminder app.
+        const prompt = `You are "Chef Remi", a warm, professional AI culinary master and food preservation specialist for the Food Reminder app.
 Your goals:
-1. Help users prevent food waste.
-2. Provide safe storage and preservation advice.
-3. Suggest quick recipes using their current items.
-4. Keep replies concise, helpful, and formatted in clean markdown with bullet points.
+1. Prevent food waste by providing realistic, delicious culinary ideas.
+2. Provide safe storage, thawing, and preservation advice.
+3. Keep replies structured, concise, and formatted in clean markdown with bullet points.
+4. Only suggest realistic flavor pairings for the items they actually have.
 
 Current Inventory:
 ${inventorySummary}
@@ -273,25 +536,26 @@ User question: "${userMessage}"`;
       }
     }
 
-    // Smart heuristic responses for common questions
+    // Smart culinary assistant responses
     const msg = userMessage.toLowerCase();
-    if (msg.includes("what should i cook") || msg.includes("recipe") || msg.includes("cook tonight")) {
+    if (msg.includes("what should i cook") || msg.includes("recipe") || msg.includes("cook tonight") || msg.includes("what can i make")) {
       const expiring = inventory.filter((i) => i.daysLeft !== undefined && i.daysLeft <= 3);
       if (expiring.length > 0) {
-        return `### 🍳 Quick Zero-Waste Recommendation\n\nYour most urgent items are **${expiring.map(i => i.name).join(", ")}**.\n\n- **Frittata or Stir-fry**: A fantastic way to use up dairy, vegetables, and leftover meats in under 15 minutes.\n- **Smoothie Bowl**: Blend softening fruits with milk or yogurt.\n- **Hearty Soup**: Sauté all remaining vegetables with olive oil, broth, and herbs.`;
+        const names = expiring.map(i => i.name).join(", ");
+        return `### 🍳 Chef Remi's Urgent Zero-Waste Advice\n\nYour most urgent items expiring soon are **${names}**.\n\n- **Quick Fresh Prep**: Use softening fruits immediately in smoothies or warm oats; sauté fresh vegetables with garlic and olive oil.\n- **Batch Cooking**: Turn mixed vegetables into a hearty simmering garden broth or vegetable curry.\n- **Check AI Recipes**: Click the **AI Recipes** button in your dashboard for tailored step-by-step recipes built directly from your ingredients!`;
       }
-      return `### 🥗 Chef Suggestion\n\nTake a look at your dashboard items! You can generate tailored recipes anytime using the **AI Recipes** button in the dashboard, or stir-fry your fresh produce with olive oil, garlic, and your favorite grains!`;
+      return `### 🥗 Chef Remi's Recommendation\n\nAll your registered items are currently fresh! You can explore personalized zero-waste dishes anytime using the **AI Recipes** button on your dashboard, or ask me for storage tips on any specific item!`;
     }
 
-    if (msg.includes("safe") || msg.includes("eat") || msg.includes("expired")) {
-      return `### 🛡️ Food Safety Rule of Thumb\n\n- **"Use By" dates** relate to food safety—do not consume meat, fish, or soft cheeses past this date.\n- **"Best Before" dates** relate to food quality and texture—dry goods, canned foods, and hard cheeses are often safe past this date if they look, smell, and taste fine.\n- **Safety Check**: Look for discoloration, off-putting odors, mold, or slimy texture. When in doubt, compost or discard.`;
+    if (msg.includes("safe") || msg.includes("eat") || msg.includes("expired") || msg.includes("spoil")) {
+      return `### 🛡️ Food Safety & Expiry Guidelines\n\n- **"Use By" dates**: Relate to food safety. Do not consume meats, seafood, or soft cheeses past this date.\n- **"Best Before" dates**: Relate to food texture and quality. Dry pantry goods, hard cheeses, and canned items are usually safe past this date if properly sealed.\n- **The Senses Test**: Check for sour or pungent odors, discoloration, mold, or slimy film. When in doubt, compost or discard.`;
     }
 
-    if (msg.includes("freeze") || msg.includes("freezer")) {
-      return `### ❄️ Smart Freezing Tips\n\n- **Bread & Pastries**: Slice first, store in airtight bags. Toast directly from frozen.\n- **Hard Cheeses**: Grate before freezing for easy sprinkling on pastas and bakes.\n- **Berries & Fruits**: Flash freeze on a tray for 2 hours, then bag together to prevent clumping.\n- **Cooked Meals**: Label with today's date; use within 3 months for peak flavor.`;
+    if (msg.includes("freeze") || msg.includes("freezer") || msg.includes("preserving")) {
+      return `### ❄️ Chef Remi's Freezing & Preservation Tips\n\n- **Bread & Bakery**: Slice first and seal tightly in freezer bags. Toast directly from frozen!\n- **Hard Cheeses**: Grate before freezing for instant sprinkling onto pasta, bakes, or pizzas.\n- **Soft Fruits & Berries**: Flash freeze on a baking sheet for 2 hours, then transfer to a freezer bag to prevent clumping in smoothies.\n- **Fresh Herbs**: Chop finely, place in ice cube trays, cover with olive oil, and freeze into handy cooking cubes.`;
     }
 
-    return `### 🌿 Hello from Chef Remi!\n\nI can help you reduce food waste, verify freshness, estimate shelf life, or craft delicious recipes from whatever is in your fridge.\n\nTry asking:\n- *"What can I cook with what's expiring soon?"*\n- *"How do I keep fresh herbs from wilting?"*\n- *"Can I freeze opened cheese or milk?"*`;
+    return `### 🌿 Hello from Chef Remi!\n\nI'm your AI kitchen preservation companion. I can help you reduce food waste, master optimal storage, and craft delicious meals from whatever is currently in your fridge.\n\nTry asking:\n- *"What can I cook with my expiring items?"*\n- *"How do I keep fresh herbs and greens from wilting?"*\n- *"Can I freeze opened cheese or milk?"*`;
   }
 
   /**
@@ -300,7 +564,6 @@ User question: "${userMessage}"`;
   private async callGemini(prompt: string): Promise<string | null> {
     if (!this.apiKey) return null;
 
-    // Use Gemini 1.5 Flash (fast and cost-effective)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(this.apiKey)}`;
 
     const payload = {
@@ -310,8 +573,8 @@ User question: "${userMessage}"`;
         }
       ],
       generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 1200,
+        temperature: 0.3,
+        maxOutputTokens: 1400,
       }
     };
 
@@ -347,56 +610,6 @@ User question: "${userMessage}"`;
       return null;
     }
   }
-
-  /**
-   * Generates dynamic, realistic zero-waste recipes when Gemini is offline
-   */
-  private generateHeuristicRecipes(items: FoodInventoryContext[], mealType?: string): GeneratedRecipe[] {
-    const mainNames = items.slice(0, 4).map((i) => i.name);
-    const expiring = items.filter((i) => (i.daysLeft ?? 10) <= 4).map((i) => i.name);
-    const highlightedItems = expiring.length > 0 ? expiring : mainNames;
-
-    return [
-      {
-        id: "recipe-zero-waste-skillet",
-        title: "Golden Farmhouse Sauté & Scramble",
-        description: `A quick, vibrant skillet dish specifically crafted to utilize your ${highlightedItems.slice(0, 2).join(" and ")} before they spoil.`,
-        prepTime: "10 mins",
-        cookTime: "12 mins",
-        difficulty: "Easy",
-        servings: 2,
-        expiringIngredientsUsed: highlightedItems.slice(0, 3),
-        additionalPantryItems: ["2 Eggs or Tofu", "Olive Oil", "Black Pepper", "Minced Garlic"],
-        instructions: [
-          `Chop your ${highlightedItems.slice(0, 2).join(" and ")} into bite-sized, even pieces.`,
-          "Heat 1 tablespoon of olive oil in a non-stick skillet over medium-high heat with minced garlic until fragrant.",
-          `Add the ${highlightedItems[0] || "vegetables"} and sauté for 4-5 minutes until tender and golden.`,
-          "Whisk 2 eggs or add crumbled tofu, pour evenly across the skillet, season with salt and pepper, and stir gently until fluffy and cooked through.",
-          "Serve warm with toasted bread or your favorite grain."
-        ],
-        nutritionalHighlight: "High protein, rich in dietary fiber and essential micronutrients."
-      },
-      {
-        id: "recipe-zero-waste-bowl",
-        title: "Chef's Garden Grain & Power Bowl",
-        description: "A nourishing, customizable bowl combining sautéed ingredients over rice, quinoa, or noodles.",
-        prepTime: "12 mins",
-        cookTime: "15 mins",
-        difficulty: "Easy",
-        servings: 2,
-        expiringIngredientsUsed: highlightedItems.slice(0, 2),
-        additionalPantryItems: ["Cooked Rice or Grains", "Soy Sauce or Dressing", "Sesame Seeds", "Chili Flakes"],
-        instructions: [
-          "Warm pre-cooked rice or grains in a serving bowl.",
-          `Quickly sear ${highlightedItems.join(", ")} in a hot pan with a splash of soy sauce or olive oil.`,
-          "Layer the cooked ingredients over the warm grains.",
-          "Drizzle with sesame oil or vinaigrette and garnish with toasted sesame seeds and chili flakes."
-        ],
-        nutritionalHighlight: "Sustained clean energy with complex carbohydrates."
-      }
-    ];
-  }
 }
 
 export const aiService = new AIService();
-

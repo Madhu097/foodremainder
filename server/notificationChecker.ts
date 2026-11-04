@@ -191,15 +191,15 @@ class NotificationChecker {
   /**
    * Check and notify a specific user
    */
-  async checkAndNotifyUser(user: User, itemsOverride?: FoodItem[]): Promise<NotificationResult | null> {
+  async checkAndNotifyUser(user: User, itemsOverride?: FoodItem[], isTest = false): Promise<NotificationResult | null> {
     // Check frequency preference (skip if override provided - i.e. test mode)
-    if (!itemsOverride && !this.shouldNotifyUser(user)) {
+    if (!isTest && !itemsOverride && !this.shouldNotifyUser(user)) {
       console.log(`[NotificationChecker] ⏭️ Skipping notification for user ${user.username} due to frequency preference`);
       return null;
     }
 
     // Check quiet hours (skip if override provided - i.e. test mode)
-    if (!itemsOverride && this.isInQuietHours(user)) {
+    if (!isTest && !itemsOverride && this.isInQuietHours(user)) {
       console.log(`[NotificationChecker] Skipping notification for user ${user.username} due to quiet hours`);
       return null;
     }
@@ -261,68 +261,92 @@ class NotificationChecker {
       pushSent: false
     };
 
-    // Send email notification
+    // Send notifications across enabled channels in parallel for speed & resilience
+    const channelTasks: Promise<void>[] = [];
+
+    // Email channel
     if (emailEnabled && emailService.isConfigured()) {
-      console.log(`[NotificationChecker] 📧 Attempting to send email notification...`);
-      result.emailSent = await emailService.sendExpiryNotification(user, expiringItems);
-      console.log(`[NotificationChecker] Email result: ${result.emailSent ? '✅ Sent' : '❌ Failed'}`);
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] 📧 Attempting to send email notification to ${user.email}...`);
+          result.emailSent = await emailService.sendExpiryNotification(user, expiringItems);
+          console.log(`[NotificationChecker] Email result: ${result.emailSent ? '✅ Sent' : '❌ Failed'}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] ❌ Email send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] ⏭️ Skipping email (enabled: ${emailEnabled}, configured: ${emailService.isConfigured()})`);
     }
 
-    // Send WhatsApp notification (try free Cloud API first, then Twilio)
+    // WhatsApp channel
     if (whatsappEnabled) {
-      console.log(`[NotificationChecker] 📱 Attempting to send WhatsApp notification...`);
-      console.log(`[NotificationChecker] User mobile: ${user.mobile}`);
-
-      if (whatsappCloudService.isConfigured()) {
-        console.log(`[NotificationChecker] Using WhatsApp Cloud API...`);
-        result.whatsappSent = await whatsappCloudService.sendExpiryNotification(user, expiringItems);
-      } else if (whatsappService.isConfigured()) {
-        console.log(`[NotificationChecker] Using Twilio WhatsApp...`);
-        result.whatsappSent = await whatsappService.sendExpiryNotification(user, expiringItems);
-      } else {
-        console.log(`[NotificationChecker] ⚠️ WhatsApp enabled but no service configured`);
-      }
-      console.log(`[NotificationChecker] WhatsApp result: ${result.whatsappSent ? '✅ Sent' : '❌ Failed'}`);
-
-      if (!result.whatsappSent) {
-        console.log(`[NotificationChecker] 🔍 WhatsApp troubleshooting:`);
-        console.log(`[NotificationChecker]    - Check if user joined Twilio sandbox`);
-        console.log(`[NotificationChecker]    - Verify mobile number format: ${user.mobile}`);
-        console.log(`[NotificationChecker]    - Check server logs for detailed error`);
-      }
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] 📱 Attempting to send WhatsApp notification...`);
+          if (whatsappCloudService.isConfigured()) {
+            result.whatsappSent = await whatsappCloudService.sendExpiryNotification(user, expiringItems);
+          } else if (whatsappService.isConfigured()) {
+            result.whatsappSent = await whatsappService.sendExpiryNotification(user, expiringItems);
+          } else {
+            console.log(`[NotificationChecker] ⚠️ WhatsApp enabled but no service configured`);
+          }
+          console.log(`[NotificationChecker] WhatsApp result: ${result.whatsappSent ? '✅ Sent' : '❌ Failed'}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] ❌ WhatsApp send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] ⏭️ Skipping WhatsApp (not enabled for user)`);
-      console.log(`[NotificationChecker] 💡 Enable WhatsApp in Profile → Notification Settings`);
     }
 
-    // Send SMS notification
+    // SMS channel
     if (smsEnabled && smsService.isConfigured()) {
-      console.log(`[NotificationChecker] 📲 Attempting to send SMS notification...`);
-      result.smsSent = await smsService.sendExpiryNotification(user, expiringItems);
-      console.log(`[NotificationChecker] SMS result: ${result.smsSent ? '✅ Sent' : '❌ Failed'}`);
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] 📲 Attempting to send SMS notification...`);
+          result.smsSent = await smsService.sendExpiryNotification(user, expiringItems);
+          console.log(`[NotificationChecker] SMS result: ${result.smsSent ? '✅ Sent' : '❌ Failed'}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] ❌ SMS send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] ⏭️ Skipping SMS (enabled: ${smsEnabled}, configured: ${smsService.isConfigured()})`);
     }
 
-    // Send Telegram notification
+    // Telegram channel
     if (telegramEnabled && telegramService.isConfigured()) {
-      console.log(`[NotificationChecker] 💬 Attempting to send Telegram notification...`);
-      result.telegramSent = await telegramService.sendExpiryNotification(user, expiringItems);
-      console.log(`[NotificationChecker] Telegram result: ${result.telegramSent ? '✅ Sent' : '❌ Failed'}`);
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] 💬 Attempting to send Telegram notification...`);
+          result.telegramSent = await telegramService.sendExpiryNotification(user, expiringItems);
+          console.log(`[NotificationChecker] Telegram result: ${result.telegramSent ? '✅ Sent' : '❌ Failed'}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] ❌ Telegram send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] ⏭️ Skipping Telegram (enabled: ${telegramEnabled}, configured: ${telegramService.isConfigured()})`);
     }
 
-    // Send Push Notification
+    // Push notification channel
     if (pushEnabled && pushService.isConfigured()) {
-      console.log(`[NotificationChecker] 🔔 Attempting to send browser push notification...`);
-      result.pushSent = await pushService.sendExpiryNotification(user, expiringItems);
-      console.log(`[NotificationChecker] Browser Push result: ${result.pushSent ? '✅ Sent' : '❌ Failed'}`);
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] 🔔 Attempting to send browser push notification...`);
+          result.pushSent = await pushService.sendExpiryNotification(user, expiringItems);
+          console.log(`[NotificationChecker] Browser Push result: ${result.pushSent ? '✅ Sent' : '❌ Failed'}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] ❌ Browser Push send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] ⏭️ Skipping browser push (enabled: ${pushEnabled}, configured: ${pushService.isConfigured()})`);
     }
+
+    // Wait for all channels concurrently
+    await Promise.allSettled(channelTasks);
 
     // Record that notification was sent (even if only some channels succeeded)
     if (result.emailSent || result.whatsappSent || result.smsSent || result.telegramSent || result.pushSent) {
@@ -366,7 +390,7 @@ class NotificationChecker {
       user.quietHoursStart = null;
 
       // 1. Try with real items
-      let result = await this.checkAndNotifyUser(user);
+      let result = await this.checkAndNotifyUser(user, undefined, true);
 
       // 2. If no real items, force a mock item
       if (!result) {

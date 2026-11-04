@@ -200,13 +200,20 @@ export default function DashboardPage() {
   // Delete food mutation
   const deleteFoodMutation = useMutation({
     mutationFn: async (itemId: string) => {
-      const response = await fetch(`${API_BASE_URL}/api/food-items/${itemId}`, {
+      const userId = currentUser?.id || "";
+      const response = await fetch(`${API_BASE_URL}/api/food-items/${itemId}?userId=${encodeURIComponent(userId)}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: currentUser!.id }),
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
+        body: JSON.stringify({ userId }),
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Failed to delete item");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete item");
+      }
       return response.json();
     },
     onMutate: async (itemId) => {
@@ -217,16 +224,17 @@ export default function DashboardPage() {
       }));
       return { previousData };
     },
-    onError: (err, itemId, context) => {
+    onError: (err: any, itemId, context) => {
       queryClient.setQueryData(["foodItems", currentUser?.id], context?.previousData);
       toast({
-        title: "Error",
-        description: "Failed to delete food item.",
+        title: "Delete Failed",
+        description: err?.message || "Failed to delete food item.",
         variant: "destructive",
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["foodItems", currentUser?.id] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["foodItems", currentUser?.id] });
+      await queryClient.refetchQueries({ queryKey: ["foodItems", currentUser?.id] });
       toast({ title: "Deleted", description: "Item removed from inventory." });
     },
   });

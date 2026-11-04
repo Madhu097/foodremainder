@@ -189,21 +189,40 @@ export class MemStorage implements IStorage {
   }
 
   async updateFoodItem(id: string, userId: string, updateData: Partial<InsertFoodItem>): Promise<FoodItem | undefined> {
-    const existing = this.foodItems.get(id);
-    if (!existing || existing.userId !== userId) {
+    const normalizedUserId = String(userId).trim();
+    let targetKey = id;
+    let existing = this.foodItems.get(id);
+
+    if (!existing || String(existing.userId).trim() !== normalizedUserId) {
+      for (const [key, item] of Array.from(this.foodItems.entries())) {
+        if ((key === id || item.id === id) && String(item.userId).trim() === normalizedUserId) {
+          targetKey = key;
+          existing = item;
+          break;
+        }
+      }
+    }
+
+    if (!existing || String(existing.userId).trim() !== normalizedUserId) {
       return undefined;
     }
     const updated: FoodItem = { ...existing, ...updateData };
-    this.foodItems.set(id, updated);
+    this.foodItems.set(targetKey, updated);
     return updated;
   }
 
   async deleteFoodItem(id: string, userId: string): Promise<boolean> {
+    const normalizedUserId = String(userId).trim();
     const existing = this.foodItems.get(id);
-    if (!existing || existing.userId !== userId) {
-      return false;
+    if (existing && String(existing.userId).trim() === normalizedUserId) {
+      return this.foodItems.delete(id);
     }
-    return this.foodItems.delete(id);
+    for (const [key, item] of Array.from(this.foodItems.entries())) {
+      if ((key === id || item.id === id) && String(item.userId).trim() === normalizedUserId) {
+        return this.foodItems.delete(key);
+      }
+    }
+    return false;
   }
 }
 

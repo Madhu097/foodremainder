@@ -354,7 +354,7 @@ var init_firebaseStorage = __esm({
         console.log(`[FirebaseStorage] \u{1F4BE} Fetching food items from database for user: ${userId}`);
         try {
           const snapshot = await db.collection("foodItems").where("userId", "==", userId).get();
-          const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          const items = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
           items.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
           this.foodItemsCache.set(cacheKey, items);
           console.log(`[FirebaseStorage] \u2705 Cached ${items.length} food items for user: ${userId}`);
@@ -369,8 +369,15 @@ var init_firebaseStorage = __esm({
       async getFoodItem(id) {
         if (!db) throw new Error("Firestore not initialized");
         const doc = await db.collection("foodItems").doc(id).get();
-        if (!doc.exists) return void 0;
-        return { id: doc.id, ...doc.data() };
+        if (doc.exists) {
+          return { ...doc.data(), id: doc.id };
+        }
+        const query = await db.collection("foodItems").where("id", "==", id).limit(1).get();
+        if (!query.empty) {
+          const first = query.docs[0];
+          return { ...first.data(), id: first.id };
+        }
+        return void 0;
       }
       async createFoodItem(userId, insertItem) {
         if (!db) throw new Error("Firestore not initialized");
@@ -391,24 +398,60 @@ var init_firebaseStorage = __esm({
       }
       async updateFoodItem(id, userId, updateData) {
         if (!db) throw new Error("Firestore not initialized");
-        const existing = await this.getFoodItem(id);
-        if (!existing || existing.userId !== userId) {
+        let docRef = null;
+        const normalizedUserId = String(userId).trim();
+        const directDoc = await db.collection("foodItems").doc(id).get();
+        if (directDoc.exists) {
+          const data = directDoc.data();
+          if (String(data?.userId).trim() === normalizedUserId) {
+            docRef = directDoc.ref;
+          }
+        }
+        if (!docRef) {
+          const query = await db.collection("foodItems").where("id", "==", id).limit(1).get();
+          if (!query.empty) {
+            const doc = query.docs[0];
+            if (String(doc.data()?.userId).trim() === normalizedUserId) {
+              docRef = doc.ref;
+            }
+          }
+        }
+        if (!docRef) {
+          console.warn(`[FirebaseStorage] \u26A0\uFE0F Update target not found: item=${id}, user=${userId}`);
           return void 0;
         }
-        await db.collection("foodItems").doc(id).update(updateData);
+        await docRef.update(updateData);
         this.foodItemsCache.invalidate(`foodItems:${userId}`);
-        return await this.getFoodItem(id);
+        const updatedDoc = await docRef.get();
+        return { ...updatedDoc.data(), id: updatedDoc.id };
       }
       async deleteFoodItem(id, userId) {
         if (!db) throw new Error("Firestore not initialized");
-        const existing = await this.getFoodItem(id);
-        if (!existing || existing.userId !== userId) {
-          return false;
+        let deleted = false;
+        const normalizedUserId = String(userId).trim();
+        const directDoc = await db.collection("foodItems").doc(id).get();
+        if (directDoc.exists) {
+          const data = directDoc.data();
+          if (String(data?.userId).trim() === normalizedUserId) {
+            await directDoc.ref.delete();
+            deleted = true;
+          }
         }
-        await db.collection("foodItems").doc(id).delete();
-        this.foodItemsCache.invalidate(`foodItems:${userId}`);
-        console.log(`[FirebaseStorage] \u2705 Deleted food item: ${id} for user: ${userId}`);
-        return true;
+        const query = await db.collection("foodItems").where("id", "==", id).get();
+        for (const doc of query.docs) {
+          const data = doc.data();
+          if (String(data?.userId).trim() === normalizedUserId) {
+            await doc.ref.delete();
+            deleted = true;
+          }
+        }
+        if (deleted) {
+          this.foodItemsCache.invalidate(`foodItems:${userId}`);
+          console.log(`[FirebaseStorage] \u2705 Successfully deleted food item: ${id} for user: ${userId}`);
+          return true;
+        }
+        console.warn(`[FirebaseStorage] \u26A0\uFE0F Item not found or unauthorized for delete: item=${id}, user=${userId}`);
+        return false;
       }
     };
   }
@@ -622,20 +665,37 @@ var MemStorage = class {
     return foodItem;
   }
   async updateFoodItem(id, userId, updateData) {
-    const existing = this.foodItems.get(id);
-    if (!existing || existing.userId !== userId) {
+    const normalizedUserId = String(userId).trim();
+    let targetKey = id;
+    let existing = this.foodItems.get(id);
+    if (!existing || String(existing.userId).trim() !== normalizedUserId) {
+      for (const [key, item] of Array.from(this.foodItems.entries())) {
+        if ((key === id || item.id === id) && String(item.userId).trim() === normalizedUserId) {
+          targetKey = key;
+          existing = item;
+          break;
+        }
+      }
+    }
+    if (!existing || String(existing.userId).trim() !== normalizedUserId) {
       return void 0;
     }
     const updated = { ...existing, ...updateData };
-    this.foodItems.set(id, updated);
+    this.foodItems.set(targetKey, updated);
     return updated;
   }
   async deleteFoodItem(id, userId) {
+    const normalizedUserId = String(userId).trim();
     const existing = this.foodItems.get(id);
-    if (!existing || existing.userId !== userId) {
-      return false;
+    if (existing && String(existing.userId).trim() === normalizedUserId) {
+      return this.foodItems.delete(id);
     }
-    return this.foodItems.delete(id);
+    for (const [key, item] of Array.from(this.foodItems.entries())) {
+      if ((key === id || item.id === id) && String(item.userId).trim() === normalizedUserId) {
+        return this.foodItems.delete(key);
+      }
+    }
+    return false;
   }
 };
 var storageInstance = null;
@@ -2065,12 +2125,12 @@ var NotificationChecker = class {
   /**
    * Check and notify a specific user
    */
-  async checkAndNotifyUser(user, itemsOverride) {
-    if (!itemsOverride && !this.shouldNotifyUser(user)) {
+  async checkAndNotifyUser(user, itemsOverride, isTest = false) {
+    if (!isTest && !itemsOverride && !this.shouldNotifyUser(user)) {
       console.log(`[NotificationChecker] \u23ED\uFE0F Skipping notification for user ${user.username} due to frequency preference`);
       return null;
     }
-    if (!itemsOverride && this.isInQuietHours(user)) {
+    if (!isTest && !itemsOverride && this.isInQuietHours(user)) {
       console.log(`[NotificationChecker] Skipping notification for user ${user.username} due to quiet hours`);
       return null;
     }
@@ -2118,57 +2178,79 @@ var NotificationChecker = class {
       telegramSent: false,
       pushSent: false
     };
+    const channelTasks = [];
     if (emailEnabled && emailService.isConfigured()) {
-      console.log(`[NotificationChecker] \u{1F4E7} Attempting to send email notification...`);
-      result2.emailSent = await emailService.sendExpiryNotification(user, expiringItems);
-      console.log(`[NotificationChecker] Email result: ${result2.emailSent ? "\u2705 Sent" : "\u274C Failed"}`);
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] \u{1F4E7} Attempting to send email notification to ${user.email}...`);
+          result2.emailSent = await emailService.sendExpiryNotification(user, expiringItems);
+          console.log(`[NotificationChecker] Email result: ${result2.emailSent ? "\u2705 Sent" : "\u274C Failed"}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] \u274C Email send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] \u23ED\uFE0F Skipping email (enabled: ${emailEnabled}, configured: ${emailService.isConfigured()})`);
     }
     if (whatsappEnabled) {
-      console.log(`[NotificationChecker] \u{1F4F1} Attempting to send WhatsApp notification...`);
-      console.log(`[NotificationChecker] User mobile: ${user.mobile}`);
-      if (whatsappCloudService.isConfigured()) {
-        console.log(`[NotificationChecker] Using WhatsApp Cloud API...`);
-        result2.whatsappSent = await whatsappCloudService.sendExpiryNotification(user, expiringItems);
-      } else if (whatsappService.isConfigured()) {
-        console.log(`[NotificationChecker] Using Twilio WhatsApp...`);
-        result2.whatsappSent = await whatsappService.sendExpiryNotification(user, expiringItems);
-      } else {
-        console.log(`[NotificationChecker] \u26A0\uFE0F WhatsApp enabled but no service configured`);
-      }
-      console.log(`[NotificationChecker] WhatsApp result: ${result2.whatsappSent ? "\u2705 Sent" : "\u274C Failed"}`);
-      if (!result2.whatsappSent) {
-        console.log(`[NotificationChecker] \u{1F50D} WhatsApp troubleshooting:`);
-        console.log(`[NotificationChecker]    - Check if user joined Twilio sandbox`);
-        console.log(`[NotificationChecker]    - Verify mobile number format: ${user.mobile}`);
-        console.log(`[NotificationChecker]    - Check server logs for detailed error`);
-      }
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] \u{1F4F1} Attempting to send WhatsApp notification...`);
+          if (whatsappCloudService.isConfigured()) {
+            result2.whatsappSent = await whatsappCloudService.sendExpiryNotification(user, expiringItems);
+          } else if (whatsappService.isConfigured()) {
+            result2.whatsappSent = await whatsappService.sendExpiryNotification(user, expiringItems);
+          } else {
+            console.log(`[NotificationChecker] \u26A0\uFE0F WhatsApp enabled but no service configured`);
+          }
+          console.log(`[NotificationChecker] WhatsApp result: ${result2.whatsappSent ? "\u2705 Sent" : "\u274C Failed"}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] \u274C WhatsApp send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] \u23ED\uFE0F Skipping WhatsApp (not enabled for user)`);
-      console.log(`[NotificationChecker] \u{1F4A1} Enable WhatsApp in Profile \u2192 Notification Settings`);
     }
     if (smsEnabled && smsService.isConfigured()) {
-      console.log(`[NotificationChecker] \u{1F4F2} Attempting to send SMS notification...`);
-      result2.smsSent = await smsService.sendExpiryNotification(user, expiringItems);
-      console.log(`[NotificationChecker] SMS result: ${result2.smsSent ? "\u2705 Sent" : "\u274C Failed"}`);
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] \u{1F4F2} Attempting to send SMS notification...`);
+          result2.smsSent = await smsService.sendExpiryNotification(user, expiringItems);
+          console.log(`[NotificationChecker] SMS result: ${result2.smsSent ? "\u2705 Sent" : "\u274C Failed"}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] \u274C SMS send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] \u23ED\uFE0F Skipping SMS (enabled: ${smsEnabled}, configured: ${smsService.isConfigured()})`);
     }
     if (telegramEnabled && telegramService.isConfigured()) {
-      console.log(`[NotificationChecker] \u{1F4AC} Attempting to send Telegram notification...`);
-      result2.telegramSent = await telegramService.sendExpiryNotification(user, expiringItems);
-      console.log(`[NotificationChecker] Telegram result: ${result2.telegramSent ? "\u2705 Sent" : "\u274C Failed"}`);
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] \u{1F4AC} Attempting to send Telegram notification...`);
+          result2.telegramSent = await telegramService.sendExpiryNotification(user, expiringItems);
+          console.log(`[NotificationChecker] Telegram result: ${result2.telegramSent ? "\u2705 Sent" : "\u274C Failed"}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] \u274C Telegram send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] \u23ED\uFE0F Skipping Telegram (enabled: ${telegramEnabled}, configured: ${telegramService.isConfigured()})`);
     }
     if (pushEnabled && pushService.isConfigured()) {
-      console.log(`[NotificationChecker] \u{1F514} Attempting to send browser push notification...`);
-      result2.pushSent = await pushService.sendExpiryNotification(user, expiringItems);
-      console.log(`[NotificationChecker] Browser Push result: ${result2.pushSent ? "\u2705 Sent" : "\u274C Failed"}`);
+      channelTasks.push((async () => {
+        try {
+          console.log(`[NotificationChecker] \u{1F514} Attempting to send browser push notification...`);
+          result2.pushSent = await pushService.sendExpiryNotification(user, expiringItems);
+          console.log(`[NotificationChecker] Browser Push result: ${result2.pushSent ? "\u2705 Sent" : "\u274C Failed"}`);
+        } catch (err) {
+          console.error(`[NotificationChecker] \u274C Browser Push send error:`, err);
+        }
+      })());
     } else {
       console.log(`[NotificationChecker] \u23ED\uFE0F Skipping browser push (enabled: ${pushEnabled}, configured: ${pushService.isConfigured()})`);
     }
+    await Promise.allSettled(channelTasks);
     if (result2.emailSent || result2.whatsappSent || result2.smsSent || result2.telegramSent || result2.pushSent) {
       await this.recordNotification(user.id);
       console.log(`[NotificationChecker] \u2705 Notification sent to ${user.username}, recorded for frequency tracking`);
@@ -2199,7 +2281,7 @@ var NotificationChecker = class {
       }
       const tempStart = user.quietHoursStart;
       user.quietHoursStart = null;
-      let result2 = await this.checkAndNotifyUser(user);
+      let result2 = await this.checkAndNotifyUser(user, void 0, true);
       if (!result2) {
         console.log("[NotificationChecker] No real expiring items found for test. Generating mock item.");
         const mockItem = {
@@ -2259,6 +2341,7 @@ var FOOD_KNOWLEDGE_BASE = {
   butter: { category: "Dairy", shelfLifeDays: 60, storage: "fridge", tips: "Can be frozen for up to 9 months if unopened." },
   cream: { category: "Dairy", shelfLifeDays: 10, storage: "fridge", tips: "Use within 7-10 days after opening." },
   paneer: { category: "Dairy", shelfLifeDays: 5, storage: "fridge", tips: "Submerge in fresh water in an airtight container to keep moist." },
+  egg: { category: "Dairy", shelfLifeDays: 28, storage: "fridge", tips: "Keep in carton in main fridge shelf, not on door rack." },
   // Fruits
   banana: { category: "Fruits", shelfLifeDays: 5, storage: "pantry", tips: "Store away from other fruits to prevent rapid ripening from ethylene gas." },
   apple: { category: "Fruits", shelfLifeDays: 28, storage: "fridge", tips: "Apples last 3-4x longer in the crisper drawer than at room temperature." },
@@ -2269,6 +2352,8 @@ var FOOD_KNOWLEDGE_BASE = {
   avocado: { category: "Fruits", shelfLifeDays: 4, storage: "pantry", tips: "Ripen on counter, then move to fridge to prolong freshness by 3-5 days." },
   tomato: { category: "Fruits", shelfLifeDays: 7, storage: "pantry", tips: "Store stem-side down at room temp. Refrigeration ruins texture and flavor." },
   mango: { category: "Fruits", shelfLifeDays: 6, storage: "pantry", tips: "Keep at room temp until soft and fragrant, then refrigerate." },
+  watermelon: { category: "Fruits", shelfLifeDays: 7, storage: "fridge", tips: "Cover cut surfaces tightly with cling film and keep chilled." },
+  grapes: { category: "Fruits", shelfLifeDays: 10, storage: "fridge", tips: "Keep in original perforated bag in produce drawer; wash before eating." },
   // Vegetables
   spinach: { category: "Vegetables", shelfLifeDays: 5, storage: "fridge", tips: "Place a dry paper towel in the box to absorb excess moisture." },
   lettuce: { category: "Vegetables", shelfLifeDays: 7, storage: "fridge", tips: "Keep leaves dry. Wrap in a cloth or paper towel inside crisper." },
@@ -2279,14 +2364,16 @@ var FOOD_KNOWLEDGE_BASE = {
   broccoli: { category: "Vegetables", shelfLifeDays: 7, storage: "fridge", tips: "Mist heads loosely or wrap in damp paper towel." },
   cucumber: { category: "Vegetables", shelfLifeDays: 7, storage: "fridge", tips: "Sensitive to cold; keep near front of fridge or warm zone." },
   bell_pepper: { category: "Vegetables", shelfLifeDays: 10, storage: "fridge", tips: "Keep whole and dry in crisper drawer." },
+  capsicum: { category: "Vegetables", shelfLifeDays: 10, storage: "fridge", tips: "Store whole in produce drawer with low humidity." },
   mushroom: { category: "Vegetables", shelfLifeDays: 6, storage: "fridge", tips: "Keep in original brown paper bag to let moisture escape." },
+  cabbage: { category: "Vegetables", shelfLifeDays: 21, storage: "fridge", tips: "Keep whole head unwashed in crisper drawer." },
+  cauliflower: { category: "Vegetables", shelfLifeDays: 10, storage: "fridge", tips: "Store stem-side up in a perforated bag to prevent condensation." },
   // Meat & Seafood
   chicken: { category: "Meat", shelfLifeDays: 2, storage: "fridge", tips: "Keep on lowest fridge shelf to avoid drips. Freeze if not cooking within 48h." },
   beef: { category: "Meat", shelfLifeDays: 3, storage: "fridge", tips: "Ground beef lasts 1-2 days; whole cuts last 3-5 days refrigerated." },
   fish: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Cook within 24-48 hours or freeze immediately." },
   salmon: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Keep on a bed of ice or in the coldest corner of the fridge." },
   prawns: { category: "Seafood", shelfLifeDays: 2, storage: "fridge", tips: "Thaw slowly in fridge, cook promptly." },
-  egg: { category: "Dairy", shelfLifeDays: 28, storage: "fridge", tips: "Keep in carton in main fridge shelf, not on door rack." },
   // Grains & Bakery
   bread: { category: "Grains", shelfLifeDays: 6, storage: "pantry", tips: "Avoid fridge (causes staling). Slice and freeze for long-term storage." },
   rice: { category: "Grains", shelfLifeDays: 180, storage: "pantry", tips: "Store in airtight jar in dry pantry. Cooked rice lasts 3-4 days in fridge." },
@@ -2294,6 +2381,26 @@ var FOOD_KNOWLEDGE_BASE = {
   flour: { category: "Grains", shelfLifeDays: 240, storage: "pantry", tips: "Seal tightly in container to prevent pantry bugs." },
   oats: { category: "Grains", shelfLifeDays: 180, storage: "pantry", tips: "Keep cool and dry. Ideal container prevents humidity absorption." }
 };
+function classifyIngredient(name, category) {
+  const n = name.toLowerCase();
+  const c = (category || "").toLowerCase();
+  if (c.includes("fruit") || /banana|apple|strawberry|berry|berries|blueberry|raspberry|orange|mango|pineapple|watermelon|melon|grape|peach|pear|plum|kiwi|papaya|lemon|lime|avocado|cherry|dates|figs/.test(n)) {
+    return "fruit";
+  }
+  if (c.includes("dairy") || /milk|cheese|yogurt|curd|paneer|butter|cream|cottage cheese|mozzarella|cheddar|parmesan|ghee/.test(n)) {
+    return "dairy";
+  }
+  if (c.includes("meat") || c.includes("seafood") || /chicken|fish|salmon|tuna|shrimp|prawn|egg|eggs|beef|pork|mutton|lamb|bacon|sausage|turkey|tofu/.test(n)) {
+    return "meat";
+  }
+  if (c.includes("veg") || /tomato|potato|onion|garlic|carrot|broccoli|spinach|lettuce|cabbage|cauliflower|bell pepper|capsicum|mushroom|cucumber|zucchini|ginger|chili|peas|corn|celery|beans|kale|brinjal|eggplant/.test(n)) {
+    return "vegetable";
+  }
+  if (c.includes("grain") || c.includes("bakery") || /bread|rice|pasta|noodle|noodles|oat|oats|oatmeal|flour|tortilla|roti|chapati|bun|toast|cereal/.test(n)) {
+    return "grain";
+  }
+  return "other";
+}
 var AIService = class {
   apiKey = null;
   constructor() {
@@ -2309,13 +2416,13 @@ var AIService = class {
     const cleanName = foodName.toLowerCase().trim();
     if (this.hasGeminiKey()) {
       try {
-        const prompt = `As a professional culinary preservation expert, return JSON only for this food item: "${foodName}".
+        const prompt = `As a culinary preservation expert, return JSON only for this food item: "${foodName}".
 Format:
 {
   "category": "Dairy" | "Fruits" | "Vegetables" | "Meat" | "Seafood" | "Grains" | "Beverages" | "Snacks" | "Other",
-  "shelfLifeDays": number (standard fresh refrigerated or pantry shelf-life from purchase date),
+  "shelfLifeDays": number,
   "storageLocation": "fridge" | "pantry" | "freezer",
-  "storageTips": "One short, practical sentence on best storage method to maximize freshness."
+  "storageTips": "Short practical sentence on best storage method."
 }`;
         const response = await this.callGemini(prompt);
         if (response) {
@@ -2376,38 +2483,48 @@ Format:
     };
   }
   /**
-   * Generate creative, delicious zero-waste recipes prioritizing expiring foods
+   * Generate zero-waste recipes strictly prioritizing the user's available and expiring foods
    */
   async generateRecipes(items, preferences) {
-    const expiringItems = items.filter((i) => i.daysLeft !== void 0 ? i.daysLeft <= 4 : true).slice(0, 8);
-    const availableNames = items.map((i) => i.name).slice(0, 15);
-    if (this.hasGeminiKey() && items.length > 0) {
+    if (!items || items.length === 0) {
+      return [];
+    }
+    const sortedItems = [...items].sort((a, b) => (a.daysLeft ?? 99) - (b.daysLeft ?? 99));
+    const availableNames = sortedItems.map((i) => i.name).slice(0, 15);
+    const expiringItems = sortedItems.filter((i) => i.daysLeft !== void 0 ? i.daysLeft <= 4 : true);
+    if (this.hasGeminiKey()) {
       try {
-        const prompt = `You are an expert zero-waste chef and nutritionist.
-The user has the following food items in their kitchen:
+        const prompt = `You are an expert master chef specialized in zero-waste cooking.
+The user has these EXACT food items in their kitchen:
 All Items: ${availableNames.join(", ")}
-Expiring Soon: ${expiringItems.map((i) => `${i.name} (${i.daysLeft ?? "unknown"} days left)`).join(", ")}
+Expiring Soonest: ${expiringItems.map((i) => `${i.name} (${i.daysLeft ?? "?"} days left)`).join(", ")}
 Preferences: Meal type: ${preferences?.mealType || "any"}, Dietary: ${preferences?.dietaryRestrictions || "none"}
 
-Generate 2-3 delicious, creative recipes that MAXIMIZE the use of the expiring ingredients.
+CRITICAL CULINARY RULES:
+1. ONLY generate recipes whose flavor combinations make genuine culinary sense. NEVER mix incompatible items (e.g. NEVER put bananas, strawberries, or milk into garlic-egg stir-fries or savory soy-sauce vegetable bowls).
+2. If the user has sweet items (fruits, sweet dairy, oats, bread), create delicious sweet/breakfast dishes (smoothies, fruit bowls, baked toast, parfaits).
+3. If the user has savory items (vegetables, proteins, grains, garlic, tomatoes), create savory dishes (saut\xE9, stir-fry, curry, soup, pasta, grain bowl).
+4. In "expiringIngredientsUsed", ONLY list names that appear in the user's list.
+5. In "instructions", explicitly mention the user's exact ingredient names.
+
 Return ONLY valid JSON matching this exact structure:
 [
   {
     "id": "recipe-1",
-    "title": "Recipe Name",
-    "description": "Short mouthwatering 1-2 sentence description",
+    "title": "Exact Title Mentioning Key Items",
+    "description": "Short appetizing description highlighting the zero-waste benefits",
     "prepTime": "10 mins",
     "cookTime": "15 mins",
     "difficulty": "Easy" | "Medium" | "Advanced",
     "servings": 2,
-    "expiringIngredientsUsed": ["Item 1", "Item 2"],
-    "additionalPantryItems": ["Salt", "Olive oil", "Garlic"],
+    "expiringIngredientsUsed": ["Exact Item 1", "Exact Item 2"],
+    "additionalPantryItems": ["Salt", "Cooking Oil", "Garlic"],
     "instructions": [
       "Step 1...",
       "Step 2...",
       "Step 3..."
     ],
-    "nutritionalHighlight": "Rich in antioxidants and lean protein"
+    "nutritionalHighlight": "High in vitamins and gut-friendly fiber"
   }
 ]`;
         const response = await this.callGemini(prompt);
@@ -2421,7 +2538,196 @@ Return ONLY valid JSON matching this exact structure:
         console.warn("[AIService] Gemini recipe generation fallback triggered:", err);
       }
     }
-    return this.generateHeuristicRecipes(items, preferences?.mealType);
+    return this.generateSmartCulinaryRecipes(sortedItems, preferences?.mealType);
+  }
+  /**
+   * Dynamic, ingredient-accurate zero-waste recipe generator
+   * Matches compatible ingredients together with zero culinary mismatches.
+   */
+  generateSmartCulinaryRecipes(items, mealType) {
+    const categorized = items.map((item) => ({
+      ...item,
+      type: classifyIngredient(item.name, item.category)
+    }));
+    const fruits = categorized.filter((i) => i.type === "fruit");
+    const veggies = categorized.filter((i) => i.type === "vegetable");
+    const dairy = categorized.filter((i) => i.type === "dairy");
+    const meats = categorized.filter((i) => i.type === "meat");
+    const grains = categorized.filter((i) => i.type === "grain");
+    const recipes = [];
+    const joinNames = (arr) => {
+      if (arr.length === 0) return "";
+      const names = arr.map((x) => typeof x === "string" ? x : x.name);
+      if (names.length === 1) return names[0];
+      if (names.length === 2) return `${names[0]} and ${names[1]}`;
+      return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+    };
+    if (fruits.length > 0) {
+      const mainFruits = fruits.slice(0, 3);
+      const usedDairy = dairy.find((d) => /milk|yogurt|curd|cream/i.test(d.name));
+      const usedGrain = grains.find((g) => /oat|bread|toast/i.test(g.name));
+      const ingredientsUsed = mainFruits.map((f) => f.name);
+      if (usedDairy) ingredientsUsed.push(usedDairy.name);
+      if (usedGrain) ingredientsUsed.push(usedGrain.name);
+      const title = `Fresh ${joinNames(mainFruits)} ${usedDairy ? "Smoothie & Parfait Bowl" : "Antioxidant Fruit Bowl"}`;
+      const instructions = [
+        `Thoroughly wash and prep your ${joinNames(mainFruits)}, peeling or slicing into bite-sized pieces.`,
+        usedDairy ? `Combine the ${mainFruits[0].name} with chilled ${usedDairy.name} in a blender (or bowl) and blend until velvety smooth.` : `Arrange the freshly cut ${joinNames(mainFruits)} in a clean serving bowl.`,
+        usedGrain ? `Top with ${usedGrain.name} and a light drizzle of honey or maple syrup for natural sweetness and crunch.` : `Garnish with a squeeze of fresh lemon/lime or mint leaves if on hand to brighten the natural flavors.`,
+        "Serve chilled immediately to enjoy maximum vitamin and antioxidant retention."
+      ];
+      recipes.push({
+        id: "recipe-fruit-sunshine",
+        title,
+        description: `A vibrant, zero-waste energizing bowl specifically crafted to consume your ${joinNames(mainFruits)} at peak freshness.`,
+        prepTime: "5 mins",
+        cookTime: "0 mins",
+        difficulty: "Easy",
+        servings: 1,
+        expiringIngredientsUsed: ingredientsUsed,
+        additionalPantryItems: ["Honey or Maple Syrup", "Cold Water or Ice", "Pinch of Cinnamon"],
+        instructions,
+        nutritionalHighlight: "Rich in natural vitamin C, potassium, and active enzymes."
+      });
+      if (grains.length > 0 || fruits.length > 1) {
+        const topFruit = fruits[0];
+        const breadOrGrain = grains[0]?.name || "Toasted Bread or Warm Oats";
+        recipes.push({
+          id: "recipe-caramelized-fruit",
+          title: `Warm Caramelized ${topFruit.name} & Golden Crisp Toast`,
+          description: `A comforting, caf\xE9-style breakfast turning softening ${topFruit.name} into rich, naturally sweet caramelized goodness.`,
+          prepTime: "5 mins",
+          cookTime: "8 mins",
+          difficulty: "Easy",
+          servings: 1,
+          expiringIngredientsUsed: [topFruit.name, ...grains[0] ? [grains[0].name] : []],
+          additionalPantryItems: ["1 tbsp Butter or Cooking Oil", "Pinch of Brown Sugar or Honey", "Cinnamon"],
+          instructions: [
+            `Slice your ${topFruit.name} evenly into 1/4-inch rounds or wedges.`,
+            "Melt 1 tbsp butter in a non-stick skillet over medium heat with a pinch of cinnamon.",
+            `Add the sliced ${topFruit.name} and gently sear for 3-4 minutes per side until golden brown and tenderly caramelized.`,
+            `Serve warm spooned generously over ${breadOrGrain}.`
+          ],
+          nutritionalHighlight: "Wholesome natural sweetness with zero processed additives."
+        });
+      }
+    }
+    if (veggies.length > 0) {
+      const mainVeggies = veggies.slice(0, 4);
+      const usedAromatics = veggies.filter((v) => /onion|garlic|ginger/i.test(v.name));
+      const usedProduce = veggies.filter((v) => !/onion|garlic|ginger/i.test(v.name));
+      const targetVeggies = usedProduce.length > 0 ? usedProduce : mainVeggies;
+      const vegNames = targetVeggies.map((v) => v.name);
+      if (usedAromatics.length > 0 && !vegNames.includes(usedAromatics[0].name)) {
+        vegNames.push(usedAromatics[0].name);
+      }
+      recipes.push({
+        id: "recipe-veg-saute",
+        title: `Farmhouse Saut\xE9ed ${joinNames(targetVeggies.slice(0, 2))} with Garlic & Herbs`,
+        description: `A fast, vibrant 10-minute skillet dish highlighting the fresh crunch and natural sweetness of your ${joinNames(targetVeggies.slice(0, 2))}.`,
+        prepTime: "8 mins",
+        cookTime: "10 mins",
+        difficulty: "Easy",
+        servings: 2,
+        expiringIngredientsUsed: vegNames.slice(0, 3),
+        additionalPantryItems: ["1 tbsp Olive Oil or Cooking Oil", "2 Cloves Minced Garlic", "Black Pepper", "Salt"],
+        instructions: [
+          `Wash and slice your ${joinNames(targetVeggies.slice(0, 2))} into even, bite-sized pieces for consistent cooking.`,
+          "Heat cooking oil in a wide skillet over medium-high heat. Add minced garlic and cook for 30 seconds until aromatic.",
+          `Toss in the ${joinNames(targetVeggies.slice(0, 2))} and saut\xE9 vigorously for 5-7 minutes until tender-crisp.`,
+          "Season with a pinch of sea salt, freshly ground black pepper, and herbs of choice. Serve immediately as a wholesome side or main."
+        ],
+        nutritionalHighlight: "Packed with dietary fiber, essential electrolytes, and immune-supporting phytonutrients."
+      });
+      recipes.push({
+        id: "recipe-veg-soup",
+        title: `Simmered Rustic ${joinNames(targetVeggies.slice(0, 2))} Garden Broth`,
+        description: `A soothing, warming zero-waste soup extracting rich savory depth from your simmered vegetables.`,
+        prepTime: "10 mins",
+        cookTime: "18 mins",
+        difficulty: "Easy",
+        servings: 2,
+        expiringIngredientsUsed: vegNames.slice(0, 4),
+        additionalPantryItems: ["2 Cups Vegetable Broth or Water", "Salt & Pepper", "1 tbsp Olive Oil", "Dried Herbs"],
+        instructions: [
+          `Roughly chop the ${joinNames(vegNames.slice(0, 3))}.`,
+          "Heat oil in a medium saucepan, add the chopped vegetables and sweat over medium heat for 4 minutes.",
+          "Pour in 2 cups of hot water or vegetable broth. Bring to a gentle boil, then reduce heat to low and cover.",
+          `Simmer for 12-15 minutes until the ${targetVeggies[0].name} is melt-in-your-mouth tender.`,
+          "Taste and adjust salt and pepper. Serve piping hot with toasted bread or rice."
+        ],
+        nutritionalHighlight: "Deeply hydrating, gut-soothing, and low calorie."
+      });
+    }
+    if (meats.length > 0) {
+      const protein = meats[0];
+      const pairedVeg = veggies.slice(0, 2);
+      const usedItems = [protein.name, ...pairedVeg.map((v) => v.name)];
+      recipes.push({
+        id: "recipe-protein-skillet",
+        title: `Pan-Seared Golden ${protein.name} ${pairedVeg.length > 0 ? "with " + joinNames(pairedVeg) : "Chef Skillet"}`,
+        description: `A high-protein, restaurant-grade pan dish ensuring your ${protein.name} is cooked to juicy perfection.`,
+        prepTime: "8 mins",
+        cookTime: "14 mins",
+        difficulty: "Medium",
+        servings: 2,
+        expiringIngredientsUsed: usedItems,
+        additionalPantryItems: ["Cooking Oil or Butter", "Minced Garlic", "Salt & Black Pepper", "Soy Sauce or Lemon"],
+        instructions: [
+          `Pat the ${protein.name} dry with paper towels and season both sides generously with salt and black pepper.`,
+          "Heat 1 tablespoon of oil or butter in a heavy-bottomed skillet over medium-high heat until shimmering.",
+          `Place the ${protein.name} into the pan. Sear undisturbed for 4-6 minutes to form a savory golden crust, then flip.`,
+          pairedVeg.length > 0 ? `Add sliced ${joinNames(pairedVeg)} into the perimeter of the pan, cooking alongside the protein until tender and glossy.` : "Baste with pan juices until cooked through.",
+          "Rest for 3 minutes before slicing and serving hot."
+        ],
+        nutritionalHighlight: "Complete high-density protein with essential amino acids."
+      });
+    }
+    if (grains.length > 0 && recipes.length < 3) {
+      const grain = grains[0];
+      const companionItems = [...veggies, ...meats, ...dairy].slice(0, 2);
+      const usedItems = [grain.name, ...companionItems.map((c) => c.name)];
+      recipes.push({
+        id: "recipe-grain-toss",
+        title: `Artisan Tossed ${grain.name} ${companionItems.length > 0 ? "with " + joinNames(companionItems) : "Primavera"}`,
+        description: `The ultimate pantry comfort food, maximizing leftover ${grain.name} into a delicious, savory bowl.`,
+        prepTime: "5 mins",
+        cookTime: "12 mins",
+        difficulty: "Easy",
+        servings: 2,
+        expiringIngredientsUsed: usedItems,
+        additionalPantryItems: ["2 tbsp Olive Oil or Butter", "Minced Garlic", "Chili Flakes", "Salt & Pepper"],
+        instructions: [
+          `Prepare or warm your ${grain.name}.`,
+          companionItems.length > 0 ? `In a hot pan with olive oil and garlic, quickly saut\xE9 your ${joinNames(companionItems)} for 3-5 minutes until tender.` : "Warm olive oil, minced garlic, and red chili flakes in a pan over medium heat.",
+          `Toss the ${grain.name} directly into the flavorful pan, coating every bite thoroughly.`,
+          "Finish with a pinch of sea salt, black pepper, and serve warm."
+        ],
+        nutritionalHighlight: "Balanced sustained energy with wholesome complex carbohydrates."
+      });
+    }
+    if (recipes.length === 0) {
+      const primaryItem = items[0]?.name || "Kitchen Fresh Produce";
+      recipes.push({
+        id: "recipe-single-item-skillet",
+        title: `Chef's Quick Seared ${primaryItem} Medley`,
+        description: `A simple, delicious zero-waste preparation tailored specifically to make ${primaryItem} shine.`,
+        prepTime: "5 mins",
+        cookTime: "10 mins",
+        difficulty: "Easy",
+        servings: 1,
+        expiringIngredientsUsed: [primaryItem],
+        additionalPantryItems: ["1 tbsp Olive Oil or Butter", "Salt & Pepper", "Aromatic Herbs or Garlic"],
+        instructions: [
+          `Gently wash and prep your ${primaryItem}.`,
+          "Heat a non-stick pan over medium heat with a drizzle of olive oil or butter.",
+          `Add the ${primaryItem} and cook gently for 5-7 minutes, tossing occasionally until tender and fragrant.`,
+          "Season to taste with salt and black pepper, and enjoy warm."
+        ],
+        nutritionalHighlight: "Wholesome, fresh home-cooked goodness with zero waste."
+      });
+    }
+    return recipes.slice(0, 3);
   }
   /**
    * Interactive AI Chef assistant answering kitchen preservation & cooking questions
@@ -2430,12 +2736,12 @@ Return ONLY valid JSON matching this exact structure:
     const inventorySummary = inventory.length > 0 ? `User's current inventory: ${inventory.map((i) => `${i.name} (${i.daysLeft ?? "?"} days left)`).join(", ")}.` : "User has no food items registered yet.";
     if (this.hasGeminiKey()) {
       try {
-        const prompt = `You are "Chef Remi", a warm, professional, and knowledgeable AI culinary assistant for the Food Reminder app.
+        const prompt = `You are "Chef Remi", a warm, professional AI culinary master and food preservation specialist for the Food Reminder app.
 Your goals:
-1. Help users prevent food waste.
-2. Provide safe storage and preservation advice.
-3. Suggest quick recipes using their current items.
-4. Keep replies concise, helpful, and formatted in clean markdown with bullet points.
+1. Prevent food waste by providing realistic, delicious culinary ideas.
+2. Provide safe storage, thawing, and preservation advice.
+3. Keep replies structured, concise, and formatted in clean markdown with bullet points.
+4. Only suggest realistic flavor pairings for the items they actually have.
 
 Current Inventory:
 ${inventorySummary}
@@ -2448,43 +2754,44 @@ User question: "${userMessage}"`;
       }
     }
     const msg = userMessage.toLowerCase();
-    if (msg.includes("what should i cook") || msg.includes("recipe") || msg.includes("cook tonight")) {
+    if (msg.includes("what should i cook") || msg.includes("recipe") || msg.includes("cook tonight") || msg.includes("what can i make")) {
       const expiring = inventory.filter((i) => i.daysLeft !== void 0 && i.daysLeft <= 3);
       if (expiring.length > 0) {
-        return `### \u{1F373} Quick Zero-Waste Recommendation
+        const names = expiring.map((i) => i.name).join(", ");
+        return `### \u{1F373} Chef Remi's Urgent Zero-Waste Advice
 
-Your most urgent items are **${expiring.map((i) => i.name).join(", ")}**.
+Your most urgent items expiring soon are **${names}**.
 
-- **Frittata or Stir-fry**: A fantastic way to use up dairy, vegetables, and leftover meats in under 15 minutes.
-- **Smoothie Bowl**: Blend softening fruits with milk or yogurt.
-- **Hearty Soup**: Saut\xE9 all remaining vegetables with olive oil, broth, and herbs.`;
+- **Quick Fresh Prep**: Use softening fruits immediately in smoothies or warm oats; saut\xE9 fresh vegetables with garlic and olive oil.
+- **Batch Cooking**: Turn mixed vegetables into a hearty simmering garden broth or vegetable curry.
+- **Check AI Recipes**: Click the **AI Recipes** button in your dashboard for tailored step-by-step recipes built directly from your ingredients!`;
       }
-      return `### \u{1F957} Chef Suggestion
+      return `### \u{1F957} Chef Remi's Recommendation
 
-Take a look at your dashboard items! You can generate tailored recipes anytime using the **AI Recipes** button in the dashboard, or stir-fry your fresh produce with olive oil, garlic, and your favorite grains!`;
+All your registered items are currently fresh! You can explore personalized zero-waste dishes anytime using the **AI Recipes** button on your dashboard, or ask me for storage tips on any specific item!`;
     }
-    if (msg.includes("safe") || msg.includes("eat") || msg.includes("expired")) {
-      return `### \u{1F6E1}\uFE0F Food Safety Rule of Thumb
+    if (msg.includes("safe") || msg.includes("eat") || msg.includes("expired") || msg.includes("spoil")) {
+      return `### \u{1F6E1}\uFE0F Food Safety & Expiry Guidelines
 
-- **"Use By" dates** relate to food safety\u2014do not consume meat, fish, or soft cheeses past this date.
-- **"Best Before" dates** relate to food quality and texture\u2014dry goods, canned foods, and hard cheeses are often safe past this date if they look, smell, and taste fine.
-- **Safety Check**: Look for discoloration, off-putting odors, mold, or slimy texture. When in doubt, compost or discard.`;
+- **"Use By" dates**: Relate to food safety. Do not consume meats, seafood, or soft cheeses past this date.
+- **"Best Before" dates**: Relate to food texture and quality. Dry pantry goods, hard cheeses, and canned items are usually safe past this date if properly sealed.
+- **The Senses Test**: Check for sour or pungent odors, discoloration, mold, or slimy film. When in doubt, compost or discard.`;
     }
-    if (msg.includes("freeze") || msg.includes("freezer")) {
-      return `### \u2744\uFE0F Smart Freezing Tips
+    if (msg.includes("freeze") || msg.includes("freezer") || msg.includes("preserving")) {
+      return `### \u2744\uFE0F Chef Remi's Freezing & Preservation Tips
 
-- **Bread & Pastries**: Slice first, store in airtight bags. Toast directly from frozen.
-- **Hard Cheeses**: Grate before freezing for easy sprinkling on pastas and bakes.
-- **Berries & Fruits**: Flash freeze on a tray for 2 hours, then bag together to prevent clumping.
-- **Cooked Meals**: Label with today's date; use within 3 months for peak flavor.`;
+- **Bread & Bakery**: Slice first and seal tightly in freezer bags. Toast directly from frozen!
+- **Hard Cheeses**: Grate before freezing for instant sprinkling onto pasta, bakes, or pizzas.
+- **Soft Fruits & Berries**: Flash freeze on a baking sheet for 2 hours, then transfer to a freezer bag to prevent clumping in smoothies.
+- **Fresh Herbs**: Chop finely, place in ice cube trays, cover with olive oil, and freeze into handy cooking cubes.`;
     }
     return `### \u{1F33F} Hello from Chef Remi!
 
-I can help you reduce food waste, verify freshness, estimate shelf life, or craft delicious recipes from whatever is in your fridge.
+I'm your AI kitchen preservation companion. I can help you reduce food waste, master optimal storage, and craft delicious meals from whatever is currently in your fridge.
 
 Try asking:
-- *"What can I cook with what's expiring soon?"*
-- *"How do I keep fresh herbs from wilting?"*
+- *"What can I cook with my expiring items?"*
+- *"How do I keep fresh herbs and greens from wilting?"*
 - *"Can I freeze opened cheese or milk?"*`;
   }
   /**
@@ -2500,8 +2807,8 @@ Try asking:
         }
       ],
       generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 1200
+        temperature: 0.3,
+        maxOutputTokens: 1400
       }
     };
     const res = await fetch(url, {
@@ -2528,53 +2835,6 @@ Try asking:
     } catch {
       return null;
     }
-  }
-  /**
-   * Generates dynamic, realistic zero-waste recipes when Gemini is offline
-   */
-  generateHeuristicRecipes(items, mealType) {
-    const mainNames = items.slice(0, 4).map((i) => i.name);
-    const expiring = items.filter((i) => (i.daysLeft ?? 10) <= 4).map((i) => i.name);
-    const highlightedItems = expiring.length > 0 ? expiring : mainNames;
-    return [
-      {
-        id: "recipe-zero-waste-skillet",
-        title: "Golden Farmhouse Saut\xE9 & Scramble",
-        description: `A quick, vibrant skillet dish specifically crafted to utilize your ${highlightedItems.slice(0, 2).join(" and ")} before they spoil.`,
-        prepTime: "10 mins",
-        cookTime: "12 mins",
-        difficulty: "Easy",
-        servings: 2,
-        expiringIngredientsUsed: highlightedItems.slice(0, 3),
-        additionalPantryItems: ["2 Eggs or Tofu", "Olive Oil", "Black Pepper", "Minced Garlic"],
-        instructions: [
-          `Chop your ${highlightedItems.slice(0, 2).join(" and ")} into bite-sized, even pieces.`,
-          "Heat 1 tablespoon of olive oil in a non-stick skillet over medium-high heat with minced garlic until fragrant.",
-          `Add the ${highlightedItems[0] || "vegetables"} and saut\xE9 for 4-5 minutes until tender and golden.`,
-          "Whisk 2 eggs or add crumbled tofu, pour evenly across the skillet, season with salt and pepper, and stir gently until fluffy and cooked through.",
-          "Serve warm with toasted bread or your favorite grain."
-        ],
-        nutritionalHighlight: "High protein, rich in dietary fiber and essential micronutrients."
-      },
-      {
-        id: "recipe-zero-waste-bowl",
-        title: "Chef's Garden Grain & Power Bowl",
-        description: "A nourishing, customizable bowl combining saut\xE9ed ingredients over rice, quinoa, or noodles.",
-        prepTime: "12 mins",
-        cookTime: "15 mins",
-        difficulty: "Easy",
-        servings: 2,
-        expiringIngredientsUsed: highlightedItems.slice(0, 2),
-        additionalPantryItems: ["Cooked Rice or Grains", "Soy Sauce or Dressing", "Sesame Seeds", "Chili Flakes"],
-        instructions: [
-          "Warm pre-cooked rice or grains in a serving bowl.",
-          `Quickly sear ${highlightedItems.join(", ")} in a hot pan with a splash of soy sauce or olive oil.`,
-          "Layer the cooked ingredients over the warm grains.",
-          "Drizzle with sesame oil or vinaigrette and garnish with toasted sesame seeds and chili flakes."
-        ],
-        nutritionalHighlight: "Sustained clean energy with complex carbohydrates."
-      }
-    ];
   }
 };
 var aiService = new AIService();
@@ -2896,11 +3156,13 @@ async function registerRoutes(app2) {
   app2.put("/api/food-items/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { userId, ...updateData } = req.body;
+      const userId = req.body?.userId || req.query?.userId || req.headers["x-user-id"] || req.headers["userid"];
+      const updateData = { ...req.body };
+      delete updateData.userId;
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
-      const item = await storage.updateFoodItem(id, userId, updateData);
+      const item = await storage.updateFoodItem(id, String(userId).trim(), updateData);
       if (!item) {
         return res.status(404).json({ message: "Food item not found or unauthorized" });
       }
@@ -2913,11 +3175,11 @@ async function registerRoutes(app2) {
   app2.delete("/api/food-items/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { userId } = req.body;
+      const userId = req.body?.userId || req.query?.userId || req.headers["x-user-id"] || req.headers["userid"];
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
-      const success = await storage.deleteFoodItem(id, userId);
+      const success = await storage.deleteFoodItem(id, String(userId).trim());
       if (!success) {
         return res.status(404).json({ message: "Food item not found or unauthorized" });
       }

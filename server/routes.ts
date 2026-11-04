@@ -460,13 +460,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/food-items/:id", async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { userId, ...updateData } = req.body;
+      const userId = (req.body?.userId || req.query?.userId || req.headers['x-user-id'] || req.headers['userid']) as string;
+      const updateData = { ...req.body };
+      delete updateData.userId;
 
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
 
-      const item = await storage.updateFoodItem(id, userId, updateData);
+      const item = await storage.updateFoodItem(id, String(userId).trim(), updateData);
 
       if (!item) {
         return res.status(404).json({ message: "Food item not found or unauthorized" });
@@ -483,13 +485,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/food-items/:id", async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { userId } = req.body;
+      const userId = (req.body?.userId || req.query?.userId || req.headers['x-user-id'] || req.headers['userid']) as string;
 
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
 
-      const success = await storage.deleteFoodItem(id, userId);
+      const success = await storage.deleteFoodItem(id, String(userId).trim());
 
       if (!success) {
         return res.status(404).json({ message: "Food item not found or unauthorized" });

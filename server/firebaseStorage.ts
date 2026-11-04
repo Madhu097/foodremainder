@@ -397,7 +397,7 @@ export class FirebaseStorage implements IStorage {
                 .where('userId', '==', userId)
                 .get();
 
-            const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodItem));
+            const items = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodItem));
 
             // Sort in memory by expiry date (asc)
             items.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
@@ -417,9 +417,21 @@ export class FirebaseStorage implements IStorage {
 
     async getFoodItem(id: string): Promise<FoodItem | undefined> {
         if (!db) throw new Error("Firestore not initialized");
+
+        // 1. Direct document lookup
         const doc = await db.collection('foodItems').doc(id).get();
-        if (!doc.exists) return undefined;
-        return { id: doc.id, ...doc.data() } as FoodItem;
+        if (doc.exists) {
+            return { ...doc.data(), id: doc.id } as FoodItem;
+        }
+
+        // 2. Fallback search by 'id' field in case doc.id !== id
+        const query = await db.collection('foodItems').where('id', '==', id).limit(1).get();
+        if (!query.empty) {
+            const first = query.docs[0];
+            return { ...first.data(), id: first.id } as FoodItem;
+        }
+
+        return undefined;
     }
 
     async createFoodItem(userId: string, insertItem: InsertFoodItem): Promise<FoodItem> {
@@ -448,36 +460,77 @@ export class FirebaseStorage implements IStorage {
     async updateFoodItem(id: string, userId: string, updateData: Partial<InsertFoodItem>): Promise<FoodItem | undefined> {
         if (!db) throw new Error("Firestore not initialized");
 
-        // First check if the item exists and belongs to the user
-        const existing = await this.getFoodItem(id);
-        if (!existing || existing.userId !== userId) {
+        let docRef = null;
+        const normalizedUserId = String(userId).trim();
+
+        // 1. Try direct doc ID
+        const directDoc = await db.collection('foodItems').doc(id).get();
+        if (directDoc.exists) {
+            const data = directDoc.data();
+            if (String(data?.userId).trim() === normalizedUserId) {
+                docRef = directDoc.ref;
+            }
+        }
+
+        // 2. Fallback: search by 'id' field
+        if (!docRef) {
+            const query = await db.collection('foodItems').where('id', '==', id).limit(1).get();
+            if (!query.empty) {
+                const doc = query.docs[0];
+                if (String(doc.data()?.userId).trim() === normalizedUserId) {
+                    docRef = doc.ref;
+                }
+            }
+        }
+
+        if (!docRef) {
+            console.warn(`[FirebaseStorage] ⚠️ Update target not found: item=${id}, user=${userId}`);
             return undefined;
         }
 
-        await db.collection('foodItems').doc(id).update(updateData);
+        await docRef.update(updateData);
 
         // Invalidate food items cache for this user
         this.foodItemsCache.invalidate(`foodItems:${userId}`);
 
-        // Return updated item
-        return await this.getFoodItem(id);
+        const updatedDoc = await docRef.get();
+        return { ...updatedDoc.data(), id: updatedDoc.id } as FoodItem;
     }
 
     async deleteFoodItem(id: string, userId: string): Promise<boolean> {
         if (!db) throw new Error("Firestore not initialized");
 
-        // First check if the item exists and belongs to the user
-        const existing = await this.getFoodItem(id);
-        if (!existing || existing.userId !== userId) {
-            return false;
+        let deleted = false;
+        const normalizedUserId = String(userId).trim();
+
+        // 1. Check direct doc ID
+        const directDoc = await db.collection('foodItems').doc(id).get();
+        if (directDoc.exists) {
+            const data = directDoc.data();
+            if (String(data?.userId).trim() === normalizedUserId) {
+                await directDoc.ref.delete();
+                deleted = true;
+            }
         }
 
-        await db.collection('foodItems').doc(id).delete();
+        // 2. Also search by 'id' field in document in case document ID is different
+        const query = await db.collection('foodItems').where('id', '==', id).get();
+        for (const doc of query.docs) {
+            const data = doc.data();
+            if (String(data?.userId).trim() === normalizedUserId) {
+                await doc.ref.delete();
+                deleted = true;
+            }
+        }
 
-        // Invalidate food items cache for this user
-        this.foodItemsCache.invalidate(`foodItems:${userId}`);
+        if (deleted) {
+            // Invalidate food items cache for this user
+            this.foodItemsCache.invalidate(`foodItems:${userId}`);
+            console.log(`[FirebaseStorage] ✅ Successfully deleted food item: ${id} for user: ${userId}`);
+            return true;
+        }
 
-        console.log(`[FirebaseStorage] ✅ Deleted food item: ${id} for user: ${userId}`);
-        return true;
+        console.warn(`[FirebaseStorage] ⚠️ Item not found or unauthorized for delete: item=${id}, user=${userId}`);
+        return false;
     }
 }
